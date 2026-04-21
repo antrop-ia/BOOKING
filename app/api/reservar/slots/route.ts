@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { getAvailability } from '@/app/lib/availability'
 import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
+import { logAuditEvent } from '@/app/lib/audit'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
@@ -10,6 +11,11 @@ export async function GET(request: Request) {
   const ip = clientIpFromHeaders(request.headers)
   const limited = rateLimit(`slots:${ip}`, { limit: 30, windowMs: 60_000 })
   if (!limited.ok) {
+    await logAuditEvent({
+      eventType: 'rate_limit_slots',
+      ip,
+      details: { resetAtMs: limited.resetAt },
+    })
     return NextResponse.json(
       { ok: false, error: 'Muitas requisições. Tente novamente em alguns segundos.' },
       {

@@ -5,6 +5,7 @@ import { readBetoSession } from '@/app/lib/beto/session'
 import { saveConversation } from '@/app/lib/beto/persistence'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { rateLimit } from '@/app/lib/rate-limit'
+import { logAuditEvent } from '@/app/lib/audit'
 
 export const runtime = 'edge'
 export const maxDuration = 30
@@ -27,6 +28,10 @@ export async function POST(req: Request) {
   const limited = rateLimit(`beto:${sessionId}`, RATE_LIMIT)
   if (!limited.ok) {
     const retrySec = Math.ceil((limited.resetAt - Date.now()) / 1000)
+    await logAuditEvent({
+      eventType: 'rate_limit_beto',
+      details: { sessionId, resetAtMs: limited.resetAt },
+    })
     return new Response(
       JSON.stringify({ error: 'Muitas mensagens. Aguarda um pouco e tenta de novo.' }),
       {

@@ -63,7 +63,13 @@ export interface CreateReservationParams {
 
 export type CreateReservationResult =
   | { ok: true; codigo: string; reservationId: string }
-  | { ok: false; error: string; code?: 'duplicate' | 'unknown' }
+  | { ok: false; error: string; code?: 'duplicate' | 'unknown' | 'invalid_phone' | 'over_limit' }
+
+/**
+ * Limite de reservas futuras ativas por numero de WhatsApp.
+ * Vale apenas para o fluxo publico — admin pode criar quantas quiser.
+ */
+const PUBLIC_WHATSAPP_LIMIT = 3
 
 export async function createReservation(
   params: CreateReservationParams
@@ -73,6 +79,28 @@ export async function createReservation(
     return { ok: false, error: 'Horário inválido' }
   }
   const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000)
+
+  // Validacao robusta de WhatsApp (aplicada a publico + admin).
+  const phone = normalizeWhatsapp(params.guest.whatsapp)
+  if (!phone.ok) {
+    return { ok: false, error: phone.error, code: 'invalid_phone' }
+  }
+
+  // Limite de reservas futuras por numero — anti-abuse, so fluxo publico.
+  if (params.source === 'public') {
+    const count = await countActiveReservationsByWhatsapp(
+      params.client,
+      params.establishmentId,
+      phone.digits
+    )
+    if (count >= PUBLIC_WHATSAPP_LIMIT) {
+      return {
+        ok: false,
+        error: `Você já tem ${PUBLIC_WHATSAPP_LIMIT} reservas ativas nesse número. Cancele uma antes de fazer outra.`,
+        code: 'over_limit',
+      }
+    }
+  }
 
   const guestContact = buildGuestContact({
     whatsapp: params.guest.whatsapp,
@@ -128,4 +156,63 @@ export function whatsappLink(phoneRaw: string, message: string): string {
   const digits = sanitizeWhatsappDigits(phoneRaw)
   const normalized = digits.startsWith('55') ? digits : `55${digits}`
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`
+}
+
+/**
+ * Valida e normaliza um numero de WhatsApp brasileiro.
+ * Aceita com ou sem codigo do pais; retorna sempre digits com prefixo 55.
+ *
+ * Formatos validos (apos remover nao-digitos):
+ *   - 10 digitos: DDD(2) + fixo(8)       — ex: 8133334444
+ *   - 11 digitos: DDD(2) + movel(9)      — ex: 81999334444
+ *   - 12 digitos: 55 + DDD + fixo(8)     — ex: 558133334444
+ *   - 13 digitos: 55 + DDD + movel(9)    — ex: 5581999334444
+ */
+export function normalizeWhatsapp(
+  raw: string
+): { ok: true; digits: string } | { ok: false; error: string } {
+  const digits = sanitizeWhatsappDigits(raw)
+  if (digits.length < 10) {
+    return {
+      ok: false,
+      error: 'Número de WhatsApp incompleto. Inclua DDD + 8 ou 9 dígitos.',
+    }
+  }
+  if (digits.length > 13) {
+    return { ok: false, error: 'Número de WhatsApp muito longo.' }
+  }
+  if (digits.length === 12 || digits.length === 13) {
+    if (!digits.startsWith('55')) {
+      return { ok: false, error: 'Número internacional não suportado (use formato BR).' }
+    }
+    return { ok: true, digits }
+  }
+  return { ok: true, digits: `55${digits}` }
+}
+
+/**
+ * Conta reservas futuras nao-canceladas no estabelecimento cujo numero de
+ * WhatsApp (normalizado) bata com o fornecido. Usa `parseGuestContact` em
+ * cada linha — O(n) no total de reservas futuras, aceitavel enquanto o
+ * volume e baixo. Uma coluna normalizada + indice resolve isso no futuro.
+ */
+async function countActiveReservationsByWhatsapp(
+  client: SupabaseClient,
+  establishmentId: string,
+  normalizedDigits: string
+): Promise<number> {
+  const { data } = await client
+    .from('reservations')
+    .select('guest_contact')
+    .eq('establishment_id', establishmentId)
+    .gte('slot_start', new Date().toISOString())
+    .neq('status', 'cancelled')
+
+  if (!data) return 0
+
+  return data.filter((r) => {
+    const parsed = parseGuestContact(r.guest_contact)
+    const theirs = normalizeWhatsapp(parsed.whatsapp)
+    return theirs.ok && theirs.digits === normalizedDigits
+  }).length
 }

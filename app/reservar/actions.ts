@@ -5,6 +5,7 @@ import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
 import { createReservation } from '@/app/lib/reservations'
 import { createAdminClient } from '@/app/lib/supabase/server'
+import { logAuditEvent } from '@/app/lib/audit'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
@@ -31,6 +32,11 @@ export async function createReservationAction(
     const ip = clientIpFromHeaders(await headers())
     const limited = rateLimit(`reserve:${ip}`, { limit: 5, windowMs: 60_000 })
     if (!limited.ok) {
+      await logAuditEvent({
+        eventType: 'rate_limit_reserve',
+        ip,
+        details: { resetAtMs: limited.resetAt },
+      })
       return {
         ok: false,
         error: 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.',
@@ -57,8 +63,33 @@ export async function createReservationAction(
     })
 
     if (!result.ok) {
+      if (result.code === 'over_limit') {
+        await logAuditEvent({
+          eventType: 'reservation_rejected_over_limit',
+          tenantId: ctx.tenantId,
+          establishmentId: ctx.establishmentId,
+          ip,
+          details: { nome: input.dados.nome },
+        })
+      } else if (result.code === 'invalid_phone') {
+        await logAuditEvent({
+          eventType: 'reservation_rejected_invalid_phone',
+          tenantId: ctx.tenantId,
+          establishmentId: ctx.establishmentId,
+          ip,
+          details: { nome: input.dados.nome, whatsappRaw: input.dados.whatsapp },
+        })
+      }
       return { ok: false, error: result.error }
     }
+
+    await logAuditEvent({
+      eventType: 'reservation_created',
+      tenantId: ctx.tenantId,
+      establishmentId: ctx.establishmentId,
+      ip,
+      details: { reservationId: result.reservationId, partySize },
+    })
 
     return { ok: true, codigo: result.codigo, reservationId: result.reservationId }
   } catch {
