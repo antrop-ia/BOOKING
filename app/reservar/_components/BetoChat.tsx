@@ -40,7 +40,7 @@ export function BetoChat() {
         aria-label="Abrir chat com o Beto"
         style={{
           position: 'fixed',
-          bottom: '20px',
+          bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
           right: '20px',
           width: '56px',
           height: '56px',
@@ -54,7 +54,7 @@ export function BetoChat() {
           display: open ? 'none' : 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 40,
+          zIndex: 9999,
           transition: 'transform 150ms',
         }}
         onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
@@ -72,7 +72,7 @@ export function BetoChat() {
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(0,0,0,0.6)',
-            zIndex: 50,
+            zIndex: 10000,
             display: 'flex',
             justifyContent: 'flex-end',
           }}

@@ -1,11 +1,26 @@
 import { NextResponse } from 'next/server'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { getAvailability } from '@/app/lib/availability'
+import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
 
 export async function GET(request: Request) {
+  const ip = clientIpFromHeaders(request.headers)
+  const limited = rateLimit(`slots:${ip}`, { limit: 30, windowMs: 60_000 })
+  if (!limited.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'Muitas requisições. Tente novamente em alguns segundos.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.max(1, Math.ceil((limited.resetAt - Date.now()) / 1000)).toString(),
+        },
+      }
+    )
+  }
+
   const url = new URL(request.url)
   const date = url.searchParams.get('date')
   const turno = (url.searchParams.get('turno') ?? 'jantar') as 'almoco' | 'jantar'

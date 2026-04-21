@@ -26,8 +26,8 @@ function generateNext14Days(): DateOption[] {
 }
 
 export const metadata = {
-  title: 'Parrilla 8187 — Reserva',
-  description: 'Reserve sua mesa na Parrilla 8187.',
+  title: 'Reservar sua mesa',
+  description: 'Escolha dia, horário e número de pessoas. Confirmação imediata.',
 }
 
 export default function ReservarPage() {

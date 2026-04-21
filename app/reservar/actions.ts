@@ -1,7 +1,10 @@
 'use server'
 
-import { createAdminClient } from '@/app/lib/supabase/server'
+import { headers } from 'next/headers'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
+import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
+import { createReservation } from '@/app/lib/reservations'
+import { createAdminClient } from '@/app/lib/supabase/server'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
@@ -25,51 +28,39 @@ export async function createReservationAction(
   | { ok: false; error: string }
 > {
   try {
+    const ip = clientIpFromHeaders(await headers())
+    const limited = rateLimit(`reserve:${ip}`, { limit: 5, windowMs: 60_000 })
+    if (!limited.ok) {
+      return {
+        ok: false,
+        error: 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.',
+      }
+    }
+
     const ctx = await resolvePublicTenantContext(TENANT_SLUG, ESTABLISHMENT_SLUG)
     if (!ctx) return { ok: false, error: 'Estabelecimento não encontrado' }
 
-    const slotStart = new Date(input.slotStartISO)
-    if (Number.isNaN(slotStart.getTime())) {
-      return { ok: false, error: 'Horário inválido' }
-    }
-    const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000)
-
-    const guestContact = [
-      input.dados.whatsapp,
-      input.dados.email,
-      input.dados.ocasiao ? `ocasião: ${input.dados.ocasiao}` : null,
-      input.dados.observacao ? `obs: ${input.dados.observacao}` : null,
-      `pessoas: ${input.partySize}`,
-    ]
-      .filter(Boolean)
-      .join(' | ')
-
-    const admin = createAdminClient()
-    const { data, error } = await admin
-      .from('reservations')
-      .insert({
-        tenant_id: ctx.tenantId,
-        establishment_id: ctx.establishmentId,
-        slot_start: slotStart.toISOString(),
-        slot_end: slotEnd.toISOString(),
-        guest_name: input.dados.nome,
-        guest_contact: guestContact,
-        status: 'confirmed',
-        source: 'public',
-      })
-      .select('id')
-      .single()
-
-    if (error) {
-      if (error.code === '23505') {
-        return { ok: false, error: 'Esse horário acabou de ser reservado. Escolha outro.' }
-      }
-      return { ok: false, error: 'Não foi possível registrar sua reserva. Tente novamente.' }
+    const partySize = Number(input.partySize)
+    if (!Number.isFinite(partySize) || partySize < 1) {
+      return { ok: false, error: 'Número de pessoas inválido' }
     }
 
-    const codigo = `#P8187-${data.id.slice(0, 4).toUpperCase()}`
+    const result = await createReservation({
+      tenantId: ctx.tenantId,
+      establishmentId: ctx.establishmentId,
+      slotStartISO: input.slotStartISO,
+      partySize,
+      status: 'confirmed',
+      source: 'public',
+      guest: input.dados,
+      client: createAdminClient(),
+    })
 
-    return { ok: true, codigo, reservationId: data.id }
+    if (!result.ok) {
+      return { ok: false, error: result.error }
+    }
+
+    return { ok: true, codigo: result.codigo, reservationId: result.reservationId }
   } catch {
     return { ok: false, error: 'Erro inesperado. Tente novamente.' }
   }
