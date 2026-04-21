@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Turnstile } from '@marsidev/react-turnstile'
 import { StatusBar } from './StatusBar'
 
 export interface DadosReserva {
@@ -9,6 +10,7 @@ export interface DadosReserva {
   email?: string
   ocasiao?: string
   observacao?: string
+  turnstileToken?: string
 }
 
 interface DadosScreenProps {
@@ -18,6 +20,8 @@ interface DadosScreenProps {
   onBack: () => void
   onConfirm: (dados: DadosReserva) => Promise<{ ok: boolean; error?: string }>
 }
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
 const ocasioes = ['Aniversário', 'Encontro', 'Negócios', 'Happy hour']
 
@@ -50,9 +54,12 @@ export default function DadosScreen({
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const canSubmit = nome.trim().length > 0 && whatsapp.trim().length > 0 && !isPending
+  const captchaReady = !TURNSTILE_SITE_KEY || turnstileToken !== null
+  const canSubmit =
+    nome.trim().length > 0 && whatsapp.trim().length > 0 && captchaReady && !isPending
 
   const getInputStyle = (fieldName: string): React.CSSProperties => ({
     ...inputStyle,
@@ -69,9 +76,13 @@ export default function DadosScreen({
         email: email.trim() || undefined,
         ocasiao: ocasiao || undefined,
         observacao: observacao.trim() || undefined,
+        turnstileToken: turnstileToken ?? undefined,
       })
       if (!result.ok) {
         setErrorMsg(result.error ?? 'Erro ao confirmar reserva')
+        // Token Turnstile e single-use: se rejeitou, forca o widget a
+        // gerar um novo (se nao, o proximo submit vai falhar na validacao).
+        setTurnstileToken(null)
       }
     })
   }
@@ -291,6 +302,18 @@ export default function DadosScreen({
             Informe nas observações.
           </p>
         </div>
+
+        {TURNSTILE_SITE_KEY && (
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+            <Turnstile
+              siteKey={TURNSTILE_SITE_KEY}
+              options={{ theme: 'dark', size: 'flexible' }}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+          </div>
+        )}
 
         {errorMsg && (
           <div

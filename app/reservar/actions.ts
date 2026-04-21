@@ -6,6 +6,7 @@ import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
 import { createReservation } from '@/app/lib/reservations'
 import { createAdminClient } from '@/app/lib/supabase/server'
 import { logAuditEvent } from '@/app/lib/audit'
+import { verifyTurnstileToken } from '@/app/lib/turnstile'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
@@ -19,6 +20,7 @@ interface CreateReservationInput {
     email?: string
     ocasiao?: string
     observacao?: string
+    turnstileToken?: string
   }
 }
 
@@ -45,6 +47,25 @@ export async function createReservationAction(
 
     const ctx = await resolvePublicTenantContext(TENANT_SLUG, ESTABLISHMENT_SLUG)
     if (!ctx) return { ok: false, error: 'Estabelecimento não encontrado' }
+
+    // Valida o captcha antes de qualquer query ao banco
+    const captcha = await verifyTurnstileToken(input.dados.turnstileToken, ip)
+    if (!captcha.ok) {
+      await logAuditEvent({
+        eventType: 'rate_limit_reserve',
+        tenantId: ctx.tenantId,
+        establishmentId: ctx.establishmentId,
+        ip,
+        details: {
+          reason: 'turnstile_failed',
+          errors: captcha.errors,
+        },
+      })
+      return {
+        ok: false,
+        error: 'Confirmação de segurança falhou. Recarregue a página e tente novamente.',
+      }
+    }
 
     const partySize = Number(input.partySize)
     if (!Number.isFinite(partySize) || partySize < 1) {
