@@ -9,7 +9,7 @@ Ordem: do mais recente (Sprint 8) para o mais antigo (Sprint 1), agrupado por mo
 ## Area do Cliente (Sprint 8)
 
 > Imagem deployada: `parrilla-booking:sprint8.1` (build local, sha e26702c1603c).
-> SHA do commit das issues I-05 a I-10: **<SHA-A-DEFINIR-NO-COMMIT>**
+> SHA do commit das issues I-05 a I-10: **47ff6eb**
 
 ### Issue: **I-01 — Schema: user_id em reservations + RLS cliente**
 Status → **Done**
@@ -74,7 +74,7 @@ middleware.ts:
 Status → **Done**
 ```
 Entregue no commit 6538705. Pequeno fix de UX (label de data) no commit
-<SHA-A-DEFINIR-NO-COMMIT>.
+47ff6eb.
 
 - app/minhas-reservas/page.tsx: server component, getUser obrigatorio,
   filtra reservations por user_id = auth.uid() via admin client (RLS
@@ -93,7 +93,7 @@ Entregue no commit 6538705. Pequeno fix de UX (label de data) no commit
 ### Issue: **I-05 — Detalhe da reserva + cancelamento**
 Status → **Done**
 ```
-Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+Entregue no commit 47ff6eb.
 
 Novos arquivos:
 - app/minhas-reservas/[codigo]/page.tsx: server, regex valida formato
@@ -121,7 +121,7 @@ Botoes:
 ### Issue: **I-06 — Vincular nova reserva ao usuario logado**
 Status → **Done**
 ```
-Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+Entregue no commit 47ff6eb.
 
 - app/reservar/actions.ts: createReservationAction agora chama
   createClient + getUser ANTES de createReservation, e passa user.id
@@ -137,7 +137,7 @@ Fluxo anonimo continua intacto (userId fica null).
 ### Issue: **I-07 — Resgatar reserva feita antes do cadastro**
 Status → **Done**
 ```
-Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+Entregue no commit 47ff6eb.
 
 - app/minhas-reservas/actions.ts (NOVO): resgatarReserva({ codigo,
   whatsapp }) com rate limit 5/min por user.id. Valida codigo P8187-XXXX,
@@ -159,7 +159,7 @@ ownership de email apos magic link).
 ### Issue: **I-08 — Header navegacional com login/logout**
 Status → **Done**
 ```
-Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+Entregue no commit 47ff6eb.
 
 Decisao de design (registrar): em vez de header full-width que duplicaria
 o branding ja existente em BookingScreen e MinhasReservasView, criamos
@@ -202,7 +202,7 @@ Documentado em docs/runbook.md secao "Templates de email Supabase".
 ### Issue: **I-10 — CTA "Salvar reserva na minha conta" pos-confirmacao**
 Status → **Done**
 ```
-Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+Entregue no commit 47ff6eb.
 
 - app/reservar/_components/ConfirmacaoScreen.tsx: novo card discreto
   acima do botao "Nova reserva", visivel so se nao logado
