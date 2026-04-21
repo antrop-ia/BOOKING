@@ -14,6 +14,7 @@ const ESTABLISHMENT_SLUG = 'boa-viagem'
 interface CreateReservationInput {
   slotStartISO: string
   partySize: string
+  spaceId: string
   dados: {
     nome: string
     whatsapp: string
@@ -72,6 +73,10 @@ export async function createReservationAction(
       return { ok: false, error: 'Número de pessoas inválido' }
     }
 
+    if (!input.spaceId || input.spaceId.trim().length === 0) {
+      return { ok: false, error: 'Escolha um espaço do restaurante' }
+    }
+
     const result = await createReservation({
       tenantId: ctx.tenantId,
       establishmentId: ctx.establishmentId,
@@ -79,6 +84,7 @@ export async function createReservationAction(
       partySize,
       status: 'confirmed',
       source: 'public',
+      spaceId: input.spaceId,
       guest: input.dados,
       client: createAdminClient(),
     })

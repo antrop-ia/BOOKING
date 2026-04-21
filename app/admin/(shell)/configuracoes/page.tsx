@@ -41,6 +41,11 @@ export default async function ConfiguracoesPage() {
           title="Bloqueios de agenda"
           description="Feriados, eventos privados e outros horários indisponíveis."
         />
+        <SettingCard
+          href="/admin/configuracoes/espacos"
+          title="Espaços do restaurante"
+          description="Salão interno, varanda, terraço… o cliente escolhe ao reservar."
+        />
       </div>
     </section>
   )

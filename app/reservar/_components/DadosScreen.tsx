@@ -17,6 +17,7 @@ interface DadosScreenProps {
   partySize: string
   dateLabel: string
   horario: string
+  espaco: string
   onBack: () => void
   onConfirm: (dados: DadosReserva) => Promise<{ ok: boolean; error?: string }>
 }
@@ -43,6 +44,7 @@ export default function DadosScreen({
   partySize,
   dateLabel,
   horario,
+  espaco,
   onBack,
   onConfirm,
 }: DadosScreenProps) {
@@ -153,7 +155,7 @@ export default function DadosScreen({
             fontFamily: "'DM Sans', sans-serif",
           }}
         >
-          Parrilla 8187 · {dateLabel} · {horario} · {partySize} pessoas
+          Parrilla 8187 · {dateLabel} · {horario} · {partySize} pessoas · {espaco}
         </div>
 
         <span

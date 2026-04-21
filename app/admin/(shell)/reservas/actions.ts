@@ -46,6 +46,7 @@ export async function cancelReservation(id: string): Promise<ActionResult> {
 export interface ManualReservationInput {
   slotStartISO: string
   partySize: number
+  spaceId?: string | null
   guest: {
     nome: string
     whatsapp: string
@@ -89,6 +90,7 @@ export async function createManualReservation(
     partySize: input.partySize,
     status: input.status ?? 'confirmed',
     source: 'admin',
+    spaceId: input.spaceId ?? null,
     guest: input.guest,
     client: admin,
   })

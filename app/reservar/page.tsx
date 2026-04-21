@@ -1,8 +1,17 @@
 import { BookingFlow } from './BookingFlow'
 import type { DateOption } from './_components/BookingScreen'
+import type { EspacoOption } from './_components/EspacoScreen'
+import { resolvePublicTenantContext } from '@/app/lib/tenant'
+import { listActiveSpaces } from '@/app/lib/spaces'
 
 const WEEKDAYS_PT_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const MESES_PT_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const MESES_PT_SHORT = [
+  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+]
+
+const TENANT_SLUG = 'parrilla8187'
+const ESTABLISHMENT_SLUG = 'boa-viagem'
 
 function generateNext14Days(): DateOption[] {
   const today = new Date()
@@ -30,9 +39,23 @@ export const metadata = {
   description: 'Escolha dia, horário e número de pessoas. Confirmação imediata.',
 }
 
-export default function ReservarPage() {
+// Forca server-rendering para refletir mudancas de espacos/horarios em tempo real.
+export const dynamic = 'force-dynamic'
+
+export default async function ReservarPage() {
   // O cookie beto_session e setado pelo middleware (ver middleware.ts).
-  // Mantemos a pagina estatica para cache rapido; o cookie vem pelo header.
   const dates = generateNext14Days()
-  return <BookingFlow dates={dates} />
+
+  // Busca os espacos ativos pra passar pra UI (decisao obrigatoria).
+  const ctx = await resolvePublicTenantContext(TENANT_SLUG, ESTABLISHMENT_SLUG)
+  const espacos: EspacoOption[] = ctx
+    ? (await listActiveSpaces(ctx.establishmentId)).map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        icon: s.icon,
+      }))
+    : []
+
+  return <BookingFlow dates={dates} espacos={espacos} />
 }

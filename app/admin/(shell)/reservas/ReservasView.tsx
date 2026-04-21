@@ -25,8 +25,16 @@ export interface ReservaRow {
   status: 'confirmed' | 'pending' | 'cancelled'
   ocasiao?: string
   notas?: string
+  espacoNome: string | null
+  espacoIcon: string | null
   criadoEm: string
   slotStartISO: string
+}
+
+export interface SpaceOption {
+  id: string
+  name: string
+  icon: string | null
 }
 
 const STATUS_STYLE: Record<
@@ -70,11 +78,13 @@ export function ReservasView({
   range,
   today,
   timezone,
+  spaces,
 }: {
   reservations: ReservaRow[]
   range: RangeFilter
   today: string
   timezone: string
+  spaces: SpaceOption[]
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -230,6 +240,7 @@ export function ReservasView({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         timezone={timezone}
+        spaces={spaces}
       />
     </section>
   )
@@ -284,9 +295,15 @@ function ReservaListItem({
       >
         <div>
           <span className="font-medium text-neutral-900">{r.nome}</span>
-          {r.ocasiao && (
-            <span className="ml-2 text-xs text-neutral-400">{r.ocasiao}</span>
-          )}
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+            {r.espacoNome && (
+              <span className="inline-flex items-center gap-1">
+                <span>{r.espacoIcon ?? '🍽️'}</span>
+                {r.espacoNome}
+              </span>
+            )}
+            {r.ocasiao && <span>· {r.ocasiao}</span>}
+          </div>
         </div>
         <span className="tabular-nums text-neutral-700">{r.pessoas}</span>
         <div>
@@ -310,6 +327,7 @@ function ReservaListItem({
             <p className="mt-0.5 text-xs text-neutral-500">
               {r.horario} · {r.turno} · {r.pessoas}{' '}
               {r.pessoas === 1 ? 'pessoa' : 'pessoas'}
+              {r.espacoNome && ` · ${r.espacoIcon ?? ''} ${r.espacoNome}`}
             </p>
           </div>
           <StatusBadge status={r.status} />
@@ -323,6 +341,12 @@ function ReservaListItem({
             <Detail label="Data" value={friendlyRelativeDate(r.dateLocal, today)} />
             <Detail label="Contato" value={r.contato || '—'} />
             <Detail label="Criado em" value={r.criadoEm} />
+            {r.espacoNome && (
+              <Detail
+                label="Espaço"
+                value={`${r.espacoIcon ?? '🍽️'} ${r.espacoNome}`}
+              />
+            )}
             {r.ocasiao && <Detail label="Ocasião" value={r.ocasiao} />}
             {r.notas && <Detail label="Observações" value={r.notas} />}
           </div>

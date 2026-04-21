@@ -13,14 +13,22 @@ const TIMES: string[] = (() => {
   return out
 })()
 
+interface SpaceOpt {
+  id: string
+  name: string
+  icon: string | null
+}
+
 export function NovaReservaModal({
   open,
   onClose,
   timezone,
+  spaces,
 }: {
   open: boolean
   onClose: () => void
   timezone: string
+  spaces: SpaceOpt[]
 }) {
   const [date, setDate] = useState('')
   const [time, setTime] = useState('19:00')
@@ -31,9 +39,17 @@ export function NovaReservaModal({
   const [ocasiao, setOcasiao] = useState('')
   const [observacao, setObservacao] = useState('')
   const [status, setStatus] = useState<'confirmed' | 'pending'>('confirmed')
+  const [spaceId, setSpaceId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [successCode, setSuccessCode] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Pre-seleciona o primeiro espaco ao abrir
+  useEffect(() => {
+    if (open && !spaceId && spaces.length > 0) {
+      setSpaceId(spaces[0].id)
+    }
+  }, [open, spaceId, spaces])
 
   useEffect(() => {
     if (open && !date) setDate(todayInTimezone(timezone))
@@ -81,6 +97,7 @@ export function NovaReservaModal({
         slotStartISO: slotStart.toISOString(),
         partySize: Number(partySize),
         status,
+        spaceId: spaceId || null,
         guest: {
           nome: nome.trim(),
           whatsapp: whatsapp.trim(),
@@ -179,6 +196,23 @@ export function NovaReservaModal({
               </select>
             </Field>
           </div>
+
+          {spaces.length > 0 && (
+            <Field label="Espaço">
+              <select
+                value={spaceId}
+                onChange={(e) => setSpaceId(e.target.value)}
+                className={inputClass}
+              >
+                {spaces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.icon ? `${s.icon} ` : ''}
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <Field label="Nome *">
             <input

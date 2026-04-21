@@ -51,6 +51,7 @@ export interface CreateReservationParams {
   partySize: number
   status: ReservationStatus
   source: ReservationSource
+  spaceId?: string | null
   guest: {
     nome: string
     whatsapp: string
@@ -121,6 +122,7 @@ export async function createReservation(
       guest_contact: guestContact,
       status: params.status,
       source: params.source,
+      space_id: params.spaceId ?? null,
     })
     .select('id')
     .single()

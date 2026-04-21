@@ -8,6 +8,7 @@ interface ConfirmacaoScreenProps {
   partySize: string
   dateLabel: string
   horario: string
+  espaco?: string
   codigo: string
   ocasiao?: string
   onNovaReserva: () => void
@@ -18,6 +19,7 @@ export default function ConfirmacaoScreen({
   partySize,
   dateLabel,
   horario,
+  espaco,
   codigo,
   ocasiao,
   onNovaReserva,
@@ -59,6 +61,19 @@ export default function ConfirmacaoScreen({
       value: `${partySize} pessoas`,
       valueStyle: { color: '#F0E8D8', fontSize: '13px', fontWeight: 700 } as React.CSSProperties,
     },
+    ...(espaco
+      ? [
+          {
+            label: 'Espaço',
+            value: espaco,
+            valueStyle: {
+              color: '#F0E8D8',
+              fontSize: '13px',
+              fontWeight: 700,
+            } as React.CSSProperties,
+          },
+        ]
+      : []),
     {
       label: 'Código',
       value: codigo,

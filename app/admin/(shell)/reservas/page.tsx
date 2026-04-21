@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/app/lib/supabase/server'
 import { resolveAdminTenantContext } from '@/app/lib/tenant'
 import { parseGuestContact, reservationCodigo } from '@/app/lib/reservations'
+import { listActiveSpaces } from '@/app/lib/spaces'
 import {
   dateRange,
   formatLocalDate,
@@ -40,7 +41,7 @@ export default async function ReservasPage({
   let query = admin
     .from('reservations')
     .select(
-      'id, slot_start, guest_name, guest_contact, status, source, created_at'
+      'id, slot_start, guest_name, guest_contact, status, source, created_at, space_id, space:establishment_spaces(name, icon)'
     )
     .eq('tenant_id', ctx.tenantId)
     .order('slot_start', { ascending: true })
@@ -53,11 +54,16 @@ export default async function ReservasPage({
       .lt('slot_start', window.endUTC.toISOString())
   }
 
-  const { data: rows } = await query
+  const [{ data: rows }, spaces] = await Promise.all([
+    query,
+    est ? listActiveSpaces(est.id) : Promise.resolve([]),
+  ])
+
   const reservations: ReservaRow[] = (rows ?? []).map((r) => {
     const slot = new Date(r.slot_start)
     const contact = parseGuestContact(r.guest_contact)
     const createdAt = new Date(r.created_at)
+    const spaceField = r.space as unknown as { name: string; icon: string | null } | null
     return {
       id: r.id,
       codigo: reservationCodigo(r.id),
@@ -71,6 +77,8 @@ export default async function ReservasPage({
       status: (r.status as ReservaRow['status']) ?? 'pending',
       ocasiao: contact.ocasiao,
       notas: contact.observacao,
+      espacoNome: spaceField?.name ?? null,
+      espacoIcon: spaceField?.icon ?? null,
       criadoEm: new Intl.DateTimeFormat('pt-BR', {
         timeZone: timezone,
         day: '2-digit',
@@ -88,6 +96,7 @@ export default async function ReservasPage({
       range={range}
       today={today}
       timezone={timezone}
+      spaces={spaces.map((s) => ({ id: s.id, name: s.name, icon: s.icon }))}
     />
   )
 }

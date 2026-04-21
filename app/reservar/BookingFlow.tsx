@@ -3,24 +3,28 @@
 import { useState } from 'react'
 import { BookingScreen, type DateOption } from './_components/BookingScreen'
 import HorariosScreen from './_components/HorariosScreen'
+import EspacoScreen, { type EspacoOption } from './_components/EspacoScreen'
 import DadosScreen, { type DadosReserva } from './_components/DadosScreen'
 import ConfirmacaoScreen from './_components/ConfirmacaoScreen'
 import { BetoChat } from './_components/BetoChat'
 import { createReservationAction } from './actions'
 
-type Screen = 'booking' | 'horarios' | 'dados' | 'confirmacao'
+type Screen = 'booking' | 'horarios' | 'espaco' | 'dados' | 'confirmacao'
 
 interface BookingFlowProps {
   dates: DateOption[]
+  espacos: EspacoOption[]
 }
 
-export function BookingFlow({ dates }: BookingFlowProps) {
+export function BookingFlow({ dates, espacos }: BookingFlowProps) {
   const [screen, setScreen] = useState<Screen>('booking')
   const [partySize, setPartySize] = useState<string>('2')
   const [dateIndex, setDateIndex] = useState<number>(0)
   const [turno, setTurno] = useState<'almoco' | 'jantar'>('jantar')
   const [selectedSlotISO, setSelectedSlotISO] = useState<string>('')
   const [selectedSlotLabel, setSelectedSlotLabel] = useState<string>('')
+  const [selectedEspacoId, setSelectedEspacoId] = useState<string>('')
+  const [selectedEspacoName, setSelectedEspacoName] = useState<string>('')
   const [confirmation, setConfirmation] = useState<{
     nome: string
     codigo: string
@@ -40,6 +44,8 @@ export function BookingFlow({ dates }: BookingFlowProps) {
     setTurno('jantar')
     setSelectedSlotISO('')
     setSelectedSlotLabel('')
+    setSelectedEspacoId('')
+    setSelectedEspacoName('')
     setConfirmation(null)
     setResetKey((k) => k + 1)
     setScreen('booking')
@@ -54,6 +60,7 @@ export function BookingFlow({ dates }: BookingFlowProps) {
           partySize={partySize}
           dateLabel={dateLabel}
           horario={selectedSlotLabel}
+          espaco={selectedEspacoName}
           codigo={confirmation.codigo}
           ocasiao={confirmation.ocasiao}
           onNovaReserva={resetFlow}
@@ -63,11 +70,13 @@ export function BookingFlow({ dates }: BookingFlowProps) {
           partySize={partySize}
           dateLabel={dateLabel}
           horario={selectedSlotLabel}
-          onBack={() => setScreen('horarios')}
+          espaco={selectedEspacoName}
+          onBack={() => setScreen('espaco')}
           onConfirm={async (dados: DadosReserva) => {
             const result = await createReservationAction({
               slotStartISO: selectedSlotISO,
               partySize,
+              spaceId: selectedEspacoId,
               dados,
             })
             if (result.ok) {
@@ -81,6 +90,19 @@ export function BookingFlow({ dates }: BookingFlowProps) {
             return result
           }}
         />
+      ) : screen === 'espaco' ? (
+        <EspacoScreen
+          partySize={partySize}
+          dateLabel={dateLabel}
+          horario={selectedSlotLabel}
+          espacos={espacos}
+          onBack={() => setScreen('horarios')}
+          onConfirm={(espacoId, espacoName) => {
+            setSelectedEspacoId(espacoId)
+            setSelectedEspacoName(espacoName)
+            setScreen('dados')
+          }}
+        />
       ) : screen === 'horarios' ? (
         <HorariosScreen
           partySize={partySize}
@@ -91,7 +113,7 @@ export function BookingFlow({ dates }: BookingFlowProps) {
           onConfirm={(slotStart, horarioLabel) => {
             setSelectedSlotISO(slotStart)
             setSelectedSlotLabel(horarioLabel)
-            setScreen('dados')
+            setScreen('espaco')
           }}
         />
       ) : (
@@ -111,7 +133,10 @@ export function BookingFlow({ dates }: BookingFlowProps) {
   )
 }
 
-const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const MESES_PT = [
+  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+  'jul', 'ago', 'set', 'out', 'nov', 'dez',
+]
 
 function monthLabel(iso: string): string {
   const d = new Date(`${iso}T00:00:00`)
