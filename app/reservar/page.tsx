@@ -31,6 +31,8 @@ export const metadata = {
 }
 
 export default function ReservarPage() {
+  // O cookie beto_session e setado pelo middleware (ver middleware.ts).
+  // Mantemos a pagina estatica para cache rapido; o cookie vem pelo header.
   const dates = generateNext14Days()
   return <BookingFlow dates={dates} />
 }

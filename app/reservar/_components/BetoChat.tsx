@@ -1,15 +1,19 @@
 'use client'
 
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, type UIMessage } from 'ai'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
-const WELCOME = 'E aí, chapa! Bora montar uma reserva boa? Posso te dar umas dicas de corte, combo ou harmonização. Me conta: quantas pessoas e se tá afim de compartilhar ou prato individual?'
+const WELCOME =
+  'E aí, chapa! Bora montar uma reserva boa? Posso te dar umas dicas de corte, combo ou harmonização. Me conta: quantas pessoas e se tá afim de compartilhar ou prato individual?'
 
 export function BetoChat() {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const { messages, sendMessage, status } = useChat({
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [resumingPrevious, setResumingPrevious] = useState(false)
+
+  const { messages, sendMessage, status, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: '/api/beto/chat' }),
   })
 
@@ -23,20 +27,50 @@ export function BetoChat() {
 
   const isThinking = status === 'submitted' || status === 'streaming'
 
+  const handleOpen = async () => {
+    setOpen(true)
+    if (historyLoaded) return
+    try {
+      const res = await fetch('/api/beto/history', { cache: 'no-store' })
+      if (res.ok) {
+        const data = (await res.json()) as { messages: UIMessage[] }
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(data.messages)
+          setResumingPrevious(true)
+        }
+      }
+    } catch {
+      // silencioso: se falhar, a conversa comeca do zero
+    } finally {
+      setHistoryLoaded(true)
+    }
+  }
+
+  const handleNewConversation = async () => {
+    try {
+      await fetch('/api/beto/history', { method: 'DELETE' })
+    } catch {
+      // sem recuperacao: se falhar, a proxima mensagem cria conversa nova no backend
+    }
+    setMessages([])
+    setResumingPrevious(false)
+    setDraft('')
+  }
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     const text = draft.trim()
     if (!text || isThinking) return
     sendMessage({ text })
     setDraft('')
+    setResumingPrevious(false)
   }
 
   return (
     <>
-      {/* Floating button */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         aria-label="Abrir chat com o Beto"
         style={{
           position: 'fixed',
@@ -63,7 +97,6 @@ export function BetoChat() {
         💬
       </button>
 
-      {/* Panel */}
       {open && (
         <div
           role="dialog"
@@ -91,7 +124,6 @@ export function BetoChat() {
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            {/* Header */}
             <header
               style={{
                 padding: '16px 18px',
@@ -119,30 +151,75 @@ export function BetoChat() {
                   B
                 </div>
                 <div>
-                  <div style={{ color: '#F0E8D8', fontWeight: 700, fontSize: '14px' }}>Beto</div>
-                  <div style={{ color: '#7A6A50', fontSize: '11px' }}>Atendente Parrilla 8187</div>
+                  <div style={{ color: '#F0E8D8', fontWeight: 700, fontSize: '14px' }}>
+                    Beto
+                  </div>
+                  <div style={{ color: '#7A6A50', fontSize: '11px' }}>
+                    Atendente Parrilla 8187
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Fechar"
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                  color: '#7A6A50',
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                ×
-              </button>
+
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleNewConversation}
+                    aria-label="Nova conversa"
+                    title="Nova conversa"
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid rgba(255,255,255,0.09)',
+                      color: '#7A6A50',
+                      height: '32px',
+                      padding: '0 10px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    Nova
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Fechar"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.09)',
+                    color: '#7A6A50',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </header>
 
-            {/* Messages */}
+            {resumingPrevious && (
+              <div
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '11px',
+                  color: '#7A6A50',
+                  backgroundColor: 'rgba(245,192,66,0.06)',
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                Continuando sua conversa anterior.
+              </div>
+            )}
+
             <div
               ref={scrollRef}
               style={{
@@ -160,12 +237,17 @@ export function BetoChat() {
                   .map((p) => (p.type === 'text' ? p.text : ''))
                   .join('')
                 if (!text.trim()) return null
-                return <Bubble key={m.id} role={m.role === 'user' ? 'user' : 'assistant'} text={text} />
+                return (
+                  <Bubble
+                    key={m.id}
+                    role={m.role === 'user' ? 'user' : 'assistant'}
+                    text={text}
+                  />
+                )
               })}
               {isThinking && <TypingIndicator />}
             </div>
 
-            {/* Composer */}
             <form
               onSubmit={onSubmit}
               style={{
@@ -261,8 +343,12 @@ function TypingIndicator() {
         }}
       >
         <span className="beto-dot">•</span>
-        <span className="beto-dot" style={{ animationDelay: '0.15s' }}>•</span>
-        <span className="beto-dot" style={{ animationDelay: '0.3s' }}>•</span>
+        <span className="beto-dot" style={{ animationDelay: '0.15s' }}>
+          •
+        </span>
+        <span className="beto-dot" style={{ animationDelay: '0.3s' }}>
+          •
+        </span>
         <style jsx>{`
           .beto-dot {
             display: inline-block;
@@ -272,8 +358,14 @@ function TypingIndicator() {
             margin: 0 1px;
           }
           @keyframes betoPulse {
-            0%, 60%, 100% { opacity: 0.3; }
-            30% { opacity: 1; }
+            0%,
+            60%,
+            100% {
+              opacity: 0.3;
+            }
+            30% {
+              opacity: 1;
+            }
           }
         `}</style>
       </div>
