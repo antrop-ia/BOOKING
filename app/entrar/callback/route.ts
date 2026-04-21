@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/app/lib/supabase/server'
+import { tryAutoResgateByEmail } from '@/app/minhas-reservas/actions'
 
 /**
  * Recebe o redirect do magic link do Supabase Auth.
@@ -40,11 +41,29 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Se o usuario clicou num link vindo da ConfirmacaoScreen (I-10),
-  // preserva o `resgatar` no destino para /minhas-reservas tratar o vinculo
-  // automatico da reserva. Sprint 8 — I-07 implementa a logica.
+  // Sprint 8 I-10: se veio com ?resgatar=, tenta vincular a reserva
+  // automaticamente comparando o email do user logado com o email gravado em
+  // guest_contact. O ownership do email ja foi provado pelo magic link.
+  // Falha silenciosa: o form manual em /minhas-reservas (I-07) continua
+  // disponivel se o auto-vinculo nao bater.
+  let autoVinculou = false
+  if (resgatar) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user?.email) {
+      try {
+        autoVinculou = await tryAutoResgateByEmail(user.id, user.email, resgatar)
+      } catch (e) {
+        console.error('[entrar/callback] auto-resgate falhou', e)
+      }
+    }
+  }
+
+  // So preserva ?resgatar= se NAO conseguiu auto-vincular — assim o form
+  // manual e o aviso so aparecem quando precisa de ajuda do user.
   const finalUrl = new URL(redirectTo, request.url)
-  if (resgatar) finalUrl.searchParams.set('resgatar', resgatar)
+  if (resgatar && !autoVinculou) finalUrl.searchParams.set('resgatar', resgatar)
 
   return NextResponse.redirect(finalUrl)
 }

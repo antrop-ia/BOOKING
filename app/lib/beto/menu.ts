@@ -267,7 +267,15 @@ export const MENU: MenuCategory[] = [
   },
 ]
 
-export const RESTAURANT_INFO = {
+export const RESTAURANT_INFO: {
+  name: string
+  fullName: string
+  location: string
+  claim: string
+  happyHour: string
+  signatureDishes: string[]
+  whatsapp: string | null
+} = {
   name: 'Parrilla 8187',
   fullName: 'Parrilla 8187 — Bar e Churrascaria',
   location: 'Boa Viagem, Recife',
@@ -279,6 +287,10 @@ export const RESTAURANT_INFO = {
     'Cupim Premium com Queijo 500g',
     'Short Rib 650g',
   ],
+  // WhatsApp publico do restaurante para botao "Falar com restaurante" em
+  // /minhas-reservas/[codigo]. Quando preenchido (formato BR, ex 5581XXXX9999),
+  // o botao aparece. Mantido null ate o cliente confirmar o numero oficial.
+  whatsapp: null,
 }
 
 export function menuAsText(): string {

@@ -52,6 +52,12 @@ export interface CreateReservationParams {
   status: ReservationStatus
   source: ReservationSource
   spaceId?: string | null
+  /**
+   * Sprint 8 I-06: id do usuario autenticado dono da reserva. Quando null,
+   * a reserva fica anonima (fluxo publico classico). Resgate posterior via
+   * I-07 vincula `user_id` retroativamente.
+   */
+  userId?: string | null
   guest: {
     nome: string
     whatsapp: string
@@ -123,6 +129,7 @@ export async function createReservation(
       status: params.status,
       source: params.source,
       space_id: params.spaceId ?? null,
+      user_id: params.userId ?? null,
     })
     .select('id')
     .single()

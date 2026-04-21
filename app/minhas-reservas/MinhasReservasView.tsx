@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState, useTransition } from 'react'
+import { resgatarReserva } from './actions'
 
 export interface MinhaReserva {
   id: string
@@ -23,7 +25,6 @@ interface Props {
   proximas: MinhaReserva[]
   historico: MinhaReserva[]
   resgatarCodigo: string | null
-  signOut: () => Promise<void>
 }
 
 const STATUS_LABEL: Record<MinhaReserva['status'], string> = {
@@ -46,79 +47,53 @@ export function MinhasReservasView({
   proximas,
   historico,
   resgatarCodigo,
-  signOut,
 }: Props) {
   return (
     <div
       className="min-h-screen max-w-[375px] mx-auto"
       style={{ backgroundColor: '#0A0906' }}
     >
-      {/* Header */}
+      {/* Header local: titulo + email. O botao "Sair" e o link pra outras
+          rotas vivem no PublicHeader fixo no topo direito. */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           padding: '22px 22px 18px',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}
       >
-        <div>
-          <div
-            style={{
-              color: '#F5C042',
-              fontSize: '9px',
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              marginBottom: '2px',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            Parrilla 8187
-          </div>
-          <div
-            style={{
-              color: '#F0E8D8',
-              fontSize: '20px',
-              fontWeight: 700,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            Minhas reservas
-          </div>
-          <div
-            style={{
-              color: '#7A6A50',
-              fontSize: '11px',
-              marginTop: '2px',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            {userEmail}
-          </div>
+        <div
+          style={{
+            color: '#F5C042',
+            fontSize: '9px',
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            marginBottom: '2px',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Parrilla 8187
         </div>
-
-        <form action={signOut}>
-          <button
-            type="submit"
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.09)',
-              color: '#7A6A50',
-              fontSize: '10px',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              padding: '6px 10px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            Sair
-          </button>
-        </form>
+        <div
+          style={{
+            color: '#F0E8D8',
+            fontSize: '20px',
+            fontWeight: 700,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Minhas reservas
+        </div>
+        <div
+          style={{
+            color: '#7A6A50',
+            fontSize: '11px',
+            marginTop: '2px',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {userEmail}
+        </div>
       </div>
 
       <div style={{ padding: '22px' }}>
@@ -175,7 +150,9 @@ export function MinhasReservasView({
         <div
           style={{
             marginTop: '40px',
-            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
           }}
         >
           <Link
@@ -199,9 +176,207 @@ export function MinhasReservasView({
           >
             + Nova reserva
           </Link>
+
+          <ResgatarSection initialCodigo={resgatarCodigo} />
         </div>
       </div>
     </div>
+  )
+}
+
+function ResgatarSection({ initialCodigo }: { initialCodigo: string | null }) {
+  const [open, setOpen] = useState(Boolean(initialCodigo))
+  const [codigo, setCodigo] = useState(initialCodigo ? `#${initialCodigo}` : '')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  // Quando o user vem do callback com ?resgatar=, abre o form ja com o codigo.
+  useEffect(() => {
+    if (initialCodigo) setOpen(true)
+  }, [initialCodigo])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    startTransition(async () => {
+      const result = await resgatarReserva({ codigo, whatsapp })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      setSuccess(`Reserva ${result.codigo} vinculada à sua conta.`)
+      setCodigo('')
+      setWhatsapp('')
+      // Reload p/ refletir a reserva agora vinculada na listagem.
+      setTimeout(() => window.location.reload(), 800)
+    })
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          width: '100%',
+          padding: '12px',
+          background: 'transparent',
+          border: '1px dashed rgba(255,255,255,0.12)',
+          color: '#7A6A50',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        + Adicionar reserva existente
+      </button>
+    )
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        backgroundColor: '#161410',
+        border: '1px solid rgba(245,192,66,0.25)',
+        borderRadius: '6px',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      <div
+        style={{
+          color: '#F5C042',
+          fontSize: '10px',
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+        }}
+      >
+        Adicionar reserva existente
+      </div>
+      <div style={{ color: '#7A6A50', fontSize: '11px', lineHeight: 1.5 }}>
+        Digite o código (#P8187-XXXX) e o WhatsApp usado na reserva.
+      </div>
+
+      <input
+        type="text"
+        value={codigo}
+        onChange={(e) => setCodigo(e.target.value)}
+        placeholder="#P8187-XXXX"
+        autoCapitalize="characters"
+        style={{
+          backgroundColor: '#0A0906',
+          border: '1px solid rgba(255,255,255,0.09)',
+          color: '#F0E8D8',
+          fontSize: '13px',
+          padding: '10px 12px',
+          borderRadius: '4px',
+          fontFamily: "'DM Mono', monospace",
+        }}
+      />
+      <input
+        type="tel"
+        value={whatsapp}
+        onChange={(e) => setWhatsapp(e.target.value)}
+        placeholder="WhatsApp (DDD + número)"
+        style={{
+          backgroundColor: '#0A0906',
+          border: '1px solid rgba(255,255,255,0.09)',
+          color: '#F0E8D8',
+          fontSize: '13px',
+          padding: '10px 12px',
+          borderRadius: '4px',
+        }}
+      />
+
+      {error && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: '4px',
+            backgroundColor: 'rgba(196,92,38,0.1)',
+            border: '1px solid rgba(196,92,38,0.3)',
+            color: '#E8892A',
+            fontSize: '11px',
+          }}
+        >
+          {error}
+        </div>
+      )}
+      {success && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: '4px',
+            backgroundColor: 'rgba(34,197,94,0.1)',
+            border: '1px solid rgba(34,197,94,0.3)',
+            color: '#86EFAC',
+            fontSize: '11px',
+          }}
+        >
+          {success}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            setError(null)
+            setSuccess(null)
+          }}
+          style={{
+            flex: 1,
+            padding: '10px',
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.09)',
+            color: '#7A6A50',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          style={{
+            flex: 1,
+            padding: '10px',
+            backgroundColor: '#F5C042',
+            border: 'none',
+            color: '#0A0906',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            borderRadius: '4px',
+            cursor: isPending ? 'progress' : 'pointer',
+            opacity: isPending ? 0.5 : 1,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {isPending ? 'Vinculando…' : 'Vincular'}
+        </button>
+      </div>
+    </form>
   )
 }
 

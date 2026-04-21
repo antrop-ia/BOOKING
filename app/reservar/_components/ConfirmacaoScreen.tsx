@@ -11,6 +11,10 @@ interface ConfirmacaoScreenProps {
   espaco?: string
   codigo: string
   ocasiao?: string
+  /** Sprint 8 I-10: email digitado em DadosScreen, usado no CTA pra pre-popular o /entrar. */
+  email?: string
+  /** Sprint 8 I-10: exibe o card "Salvar reserva na minha conta" quando o user nao esta logado. */
+  showSaveAccountCta?: boolean
   onNovaReserva: () => void
 }
 
@@ -22,6 +26,8 @@ export default function ConfirmacaoScreen({
   espaco,
   codigo,
   ocasiao,
+  email,
+  showSaveAccountCta,
   onNovaReserva,
 }: ConfirmacaoScreenProps) {
   const [primaryHover, setPrimaryHover] = useState(false)
@@ -232,6 +238,48 @@ export default function ConfirmacaoScreen({
             </div>
           ))}
         </div>
+
+        {showSaveAccountCta && (
+          <a
+            href={`/entrar?${new URLSearchParams({
+              ...(email ? { email } : {}),
+              resgatar: codigo.replace(/^#/, ''),
+            }).toString()}`}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '14px 16px',
+              backgroundColor: 'rgba(245,192,66,0.06)',
+              border: '1px solid rgba(245,192,66,0.25)',
+              borderRadius: '4px',
+              color: '#F0E8D8',
+              fontSize: '12px',
+              textDecoration: 'none',
+              marginBottom: '14px',
+              fontFamily: "'DM Sans', sans-serif",
+              lineHeight: 1.5,
+            }}
+          >
+            <div
+              style={{
+                color: '#F5C042',
+                fontSize: '10px',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+              }}
+            >
+              Quer acompanhar essa reserva depois?
+            </div>
+            <div style={{ color: '#9B9385', fontSize: '12px', marginBottom: '6px' }}>
+              Crie um acesso rápido com o seu e-mail. A gente vincula a reserva à sua conta automaticamente.
+            </div>
+            <span style={{ color: '#F5C042', fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em' }}>
+              Criar acesso rápido →
+            </span>
+          </a>
+        )}
 
         <button
           onClick={onNovaReserva}

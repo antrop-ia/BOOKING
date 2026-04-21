@@ -119,6 +119,39 @@ Plataforma de Reservas Online + Atendente IA "Beto"
 - **Decisão:** Conversas só vivem na sessão do navegador; nada é gravado no banco.
 - **Motivo:** Zero superfície LGPD nesta fase; se o cliente quiser depois, é feature isolada.
 
+### D-042 — Magic link como auth do cliente final (21/04/2026)
+
+- **Contexto:** Entregar área do cliente (login + histórico de reservas + cancelamento self-service) sem adicionar dependências externas nem custo mensal.
+- **Decisão:** Usar Supabase Auth com magic link por email como único método de V1. Cliente reserva sem login continua funcionando (conversão > atrito); login é opt-in.
+- **Motivo:** Zero senha para lembrar, funciona entre dispositivos, reaproveita infra já usada pelo admin, mesma migração futura para OTP/WhatsApp é aditiva.
+- **Descartado:** Email+senha (pior UX), OTP WhatsApp (depende de Twilio/Evolution paga), consulta só por código (sem histórico entre dispositivos).
+
+### D-043 — Exceção ao padrão de 7 modules fixos (21/04/2026)
+
+- **Contexto:** O padrão AntropIA § 4.2 define 7 modules canônicos (Fluxo Público, Atendente IA, Disponibilidade, Painel Admin, Auth & Multi-tenant, Segurança & Saneamento, Infraestrutura & DevOps). A feature "Área do Cliente" tem superfície suficientemente distinta (novas rotas, nova persistência de identidade, fluxo próprio) que agrupá-la em `Auth & Multi-tenant` ou `Fluxo Público` esconderia o escopo no board.
+- **Decisão:** Criar 8º module `Área do Cliente` + 7º cycle `Sprint 8 - Área do Cliente` (02/05 → 09/05) só neste projeto (BOOK). O padrão permanece válido para novos projetos.
+- **Motivo:** Visibilidade no painel > pureza do padrão. O stakeholder abre o módulo e vê a feature inteira agrupada.
+- **Impacto:** `rules-operacionais.md` deste projeto ganha a exceção; o template applier AntropIA (`/opt/plane/antropia-template/`) permanece inalterado — futuros projetos seguem os 7 padrões.
+
+### D-044 — user_id nullable + RLS por auth.uid() (21/04/2026)
+
+- **Contexto:** Reservas existentes foram feitas sem conta; reservas futuras podem ou não ter usuário logado.
+- **Decisão:** Coluna `reservations.user_id uuid NULL` com FK `auth.users(id) ON DELETE SET NULL` + nova RLS policy permitindo SELECT quando `user_id = auth.uid()`. Admin continua lendo tudo via service role.
+- **Motivo:** Zero impacto nas reservas existentes, zero perda de histórico se usuário for deletado, permite fluxo anônimo + fluxo logado lado a lado.
+
+### D-045 — `PublicHeader` como pill flutuante (21/04/2026)
+
+- **Contexto:** I-08 pedia "header navegacional" nas telas públicas. `BookingScreen` (`/reservar`) já tem cabeçalho próprio rico (logo P 8187 + endereço + divisor) e `MinhasReservasView` também tinha um cabeçalho inline. Um header full-width adicional duplicaria o branding e empurraria o conteúdo do BookingFlow para baixo, quebrando o ritmo visual mobile-first.
+- **Decisão:** `PublicHeader` é um *pill flutuante* (`position: fixed`, `top:14px`, `right:14px`, `z-index:50`) que mostra "Entrar" se deslogado, ou "Minhas reservas" + "Sair" se logado. Server component, sem JS extra (form action). Aplicado em `/reservar`, `/minhas-reservas` e `/minhas-reservas/[codigo]` — fica fora de `/`, `/entrar` e `/admin`. O cabeçalho inline antigo de `MinhasReservasView` perdeu o botão "Sair" duplicado.
+- **Motivo:** Discreto, zero regressão visual nos fluxos existentes, mobile-first sem reflow.
+
+### D-046 — Auto-resgate de reserva por email no callback do magic link (21/04/2026)
+
+- **Contexto:** I-10 cria CTA "Salvar reserva na minha conta" em `ConfirmacaoScreen` que leva o cliente recém-confirmado para `/entrar?email=X&resgatar=CODIGO`. O fluxo "puro" exigiria que ele preenchesse WhatsApp de novo no form de resgate manual (I-07) — atrito desnecessário.
+- **Decisão:** Quando o callback do magic link recebe `?resgatar=CODIGO`, o servidor tenta `tryAutoResgateByEmail`: busca a reserva por prefixo do UUID + `user_id IS NULL` e, se o email gravado em `guest_contact` bater com `user.email`, vincula `user_id = auth.uid()` automaticamente. Se o auto-vínculo falha, o `?resgatar=` é preservado no redirect para que o form manual abra com o código pré-preenchido (fallback I-07).
+- **Motivo:** Ownership do email já foi provado pelo magic link (Supabase Auth) — exigir WhatsApp seria redundante. Falha silenciosa garante que o caminho manual continua disponível e não há cenário de "vínculo errado" porque o match é estrito por email.
+- **Risco descartado:** Alguém compartilhar a URL de confirmação. Para reivindicar, atacante precisaria ter acesso ao email da reserva — o mesmo que faria login normal — então o ataque não adiciona superfície.
+
 ---
 
 ## 6. Pendências de decisão

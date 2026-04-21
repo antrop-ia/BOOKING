@@ -3,6 +3,8 @@ import type { DateOption } from './_components/BookingScreen'
 import type { EspacoOption } from './_components/EspacoScreen'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { listActiveSpaces } from '@/app/lib/spaces'
+import { PublicHeader } from '@/app/_components/PublicHeader'
+import { createClient } from '@/app/lib/supabase/server'
 
 const WEEKDAYS_PT_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const MESES_PT_SHORT = [
@@ -57,5 +59,18 @@ export default async function ReservarPage() {
       }))
     : []
 
-  return <BookingFlow dates={dates} espacos={espacos} />
+  // Sprint 8 I-10: passa `isAuthenticated` pra ConfirmacaoScreen decidir se
+  // mostra o CTA "salvar reserva na minha conta". Se ja esta logado, a
+  // reserva ja foi vinculada via I-06 e CTA seria redundante.
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  return (
+    <>
+      <PublicHeader />
+      <BookingFlow dates={dates} espacos={espacos} isAuthenticated={Boolean(user)} />
+    </>
+  )
 }

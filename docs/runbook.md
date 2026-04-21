@@ -326,6 +326,80 @@ docker service update --force uptime-kuma_kuma
 
 ---
 
+## 7. Sprint 8 — pre-requisitos no Supabase Dashboard
+
+A Sprint 8 (login do cliente final) introduz duas dependencias de configuracao
+**no Dashboard do Supabase** (nao em env var). Sem elas, magic link nao
+funciona.
+
+### 7.1 Redirect URL do magic link
+
+Authentication -> URL Configuration -> Redirect URLs deve conter:
+
+```
+https://reservas.parilla8187.antrop-ia.com/entrar/callback
+```
+
+Sem essa entrada, o `signInWithOtp` retorna erro silencioso e o cliente
+recebe email cujo link aponta para a URL default (geralmente localhost).
+
+### 7.2 Magic Link habilitado
+
+Authentication -> Email Templates -> Magic Link deve estar **enabled**.
+
+### 7.3 Migration `user_id` em reservations
+
+Migration `supabase/migrations/20260421_reservations_user_id.sql` precisa
+estar aplicada. Idempotente — pode rodar varias vezes sem efeito colateral.
+Aplicacao manual: SQL Editor -> Run.
+
+Validacao apos aplicar:
+
+```sql
+select count(*), count(user_id),
+       count(*) filter (where user_id is null) as anonimas
+  from reservations;
+```
+
+Reservas pre-Sprint 8 ficam com `user_id = null` (esperado).
+
+---
+
+## 8. Templates de email Supabase
+
+### 8.1 Onde editar
+
+Supabase Dashboard -> Authentication -> Email Templates.
+
+Templates customizados pelo projeto (cole HTML do arquivo correspondente):
+
+| Template | Arquivo versionado | Subject |
+|---|---|---|
+| Magic Link | `docs/email-templates/magic-link.html` | "Seu acesso à Parrilla 8187 está pronto" |
+
+### 8.2 Como testar (sem mexer em producao)
+
+1. Em producao, abrir `https://reservas.parilla8187.antrop-ia.com/entrar`
+2. Submeter o form com um email pessoal que voce tenha acesso
+3. Verificar caixa de entrada — deve chegar email com layout dark Parrilla,
+   logo P 8187 amarelo, botao "Entrar na Parrilla"
+4. Clicar no link -> deve cair em `/minhas-reservas` (ou no destino do
+   `?redirect=` se houver)
+
+### 8.3 Limites de envio
+
+SMTP padrao do Supabase: ~3-4 emails/hora por endereco. Suficiente para
+demo + uso individual. Para go-live publico real, configurar SMTP customizado
+(Resend / SendGrid) em Project Settings -> Auth -> SMTP.
+
+### 8.4 Se sobrescreverem o template no Dashboard
+
+O HTML versionado em `docs/email-templates/` e a fonte da verdade. Reaplicar
+copy-paste. Variavel obrigatoria do template: `{{ .ConfirmationURL }}` —
+nao remover.
+
+---
+
 ## Apendice — referencias rapidas
 
 ### Locais importantes
@@ -377,3 +451,4 @@ tail -20 /var/log/parrilla-backup.log
 ### Historico deste runbook
 
 - `2026-04-21` — versao inicial, cobrindo rollback do app, restore de banco, reset de senha admin, certificado Let's Encrypt e Uptime Kuma
+- `2026-04-21` — Sprint 8: secao 7 (pre-requisitos Supabase para magic link) e secao 8 (templates de email customizados)

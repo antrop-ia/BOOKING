@@ -14,61 +14,118 @@ Plataforma de Reservas Online + Atendente IA "Beto"
 
 ## Status geral
 
-**Em atenção**
+**Demo-ready · Produto em produção**
 
-_Frontend público funcional em produção; painel administrativo entregue em modo demonstração (mock) e precisa ser conectado aos dados reais antes do go-live operacional. Há também 2 endpoints de debug expostos sem autenticação que precisam ser removidos antes da divulgação pública._
+_Todos os fluxos críticos estão no ar e operacionais: fluxo público de reserva com captcha, Atendente Beto com histórico persistente e rate limiting, painel administrativo com CRUD real de reservas + edição de configurações/horários/bloqueios, backup diário automatizado. Há 1 reserva de teste (Rafael Cavalcanti, 25/04 15:00) e 2 conversas do Beto no banco — aceitáveis como prova de funcionamento durante a demo, removíveis em 1 comando se preferirem demo zerado._
 
 ## Etapa atual
 
-**Desenvolvimento — Sprint final do MVP / preparação para go-live**
+**Pronto para apresentação ao cliente · validações finais pré-demo**
 
 ## Resumo rápido
 
-A frente pública está pronta e recebe reservas reais (testada end-to-end: data → horário → dados → confirmação com código `#P8187-XXXX` gravado no banco). O atendente Beto responde com streaming via Groq usando o cardápio completo da Parrilla. O painel admin está com a UI 100% pronta (dashboard, listagem de reservas com filtros e busca, configurações), mas a tela de reservas usa um array mock de 12 reservas fictícias e os botões de ação (Confirmar, Cancelar, WhatsApp) ainda não têm handler. Próximo passo é o Sprint 1 (saneamento de segurança) seguido do Sprint 2 (admin conectado ao banco), que juntos transformam o sistema de "demo bonita" em "produto operável pelo restaurante".
+A plataforma está em produção em `https://reservas.parilla8187.antrop-ia.com`, com HTTPS válido, domínio dedicado e stack em Docker Swarm com rollback testado. O fluxo público de reserva funciona ponta-a-ponta no celular (4 telas mobile-first com captcha Turnstile, limite de 3 reservas por WhatsApp e validação robusta de número). O Beto responde com streaming via Groq, retoma conversa pelo cookie de sessão e está rate-limited em 30 msg/hora. O painel admin está 100% conectado ao banco real (CRUD de reservas + botão WhatsApp + edição de identidade de marca + gestão de horários e bloqueios). Backup diário às 03:30 em `/var/backups/parrilla-booking/` com rotação 30 dias. Uptime Kuma publicado em `uptime.parilla8187.antrop-ia.com` aguardando configuração do monitor + canal de notificação (5 min). Credenciais do admin rotacionadas para senha aleatória guardada no cofre do cliente.
 
 ## O que já foi feito
 
-- ✅ **Infraestrutura**: deploy em Docker Swarm + Traefik no servidor AntropIA, HTTPS automático via Let's Encrypt, healthcheck, restart policy, rollback em caso de falha
-- ✅ **Domínio**: `reservas.parilla8187.antrop-ia.com` apontando para o servidor (DNS corrigido de Vercel para servidor próprio)
-- ✅ **Fluxo público de reserva**: 4 telas mobile-first com gravação real no Supabase, geração de código de reserva, conflict detection (slot duplicado)
-- ✅ **API de disponibilidade**: `/api/reservar/slots` calcula horários livres a partir de `business_hours`, `reservations` e `slot_blocks`
-- ✅ **Atendente Beto**: integração com Groq (Llama 3.3-70B), streaming, system prompt com personalidade local, cardápio completo (~80 itens) hardcoded
-- ✅ **Botão flutuante do Beto** com correções específicas para mobile (z-index alto, safe-area-inset, viewport-fit=cover)
-- ✅ **Autenticação admin**: Supabase Auth, middleware de proteção de rotas, login/logout funcional
-- ✅ **Usuário admin provisionado**: `admin@parrilla8187.com.br` com role `owner` no tenant
-- ✅ **Painel admin (UI)**: shell com sidebar e header, dashboard com KPIs e próximas reservas, listagem de reservas com filtros (Hoje/Amanhã/Semana/Todos), busca, badges de status, expansão de detalhes; tela de configurações
-- ✅ **Documentação base**: 4 documentos padrão de projeto preenchidos com o estado real
+- ✅ **Infraestrutura**: deploy em Docker Swarm + Traefik + HTTPS automático + healthcheck + rollback documentado
+- ✅ **Domínio**: `reservas.parilla8187.antrop-ia.com` em produção
+- ✅ **Fluxo público de reserva**: 4 telas mobile-first com gravação real, código `#P8187-XXXX`, conflict detection
+- ✅ **Captcha** (Sprint 6): Cloudflare Turnstile no `DadosScreen`, token validado server-side antes de qualquer query
+- ✅ **Validação de WhatsApp** (Sprint 6): `normalizeWhatsapp` com 10–13 dígitos + prefixo 55 implícito
+- ✅ **Limite anti-abuso** (Sprint 6): máx. 3 reservas futuras ativas por número; admin bypassa o limite
+- ✅ **Audit log** (Sprint 6): tabela `audit_log` com eventos `reservation_rejected_over_limit`, `reservation_rejected_invalid_phone`, `rate_limit_*`, `reservation_created` — 35 reqs → 5 bloqueios já registrados no banco
+- ✅ **API de disponibilidade**: `/api/reservar/slots` com cálculo a partir de `business_hours` + `reservations` + `slot_blocks`
+- ✅ **Atendente Beto** (Sprint 3): integração Groq (Llama 3.3-70B) com streaming, system prompt com personalidade local, cardápio completo (~80 itens)
+- ✅ **Persistência do Beto** (Sprint 3): tabela `beto_conversations`, retomada via cookie `beto_session`, badge "Continuando sua conversa anterior"
+- ✅ **Rate limiting do Beto** (Sprint 3): 30 mensagens/hora por sessão, HTTP 429 + Retry-After
+- ✅ **Autenticação admin**: Supabase Auth + middleware de proteção; senha rotacionada para aleatória pós-provisionamento
+- ✅ **Painel admin (Sprint 2)**: dashboard com KPIs reais, CRUD de reservas conectado ao banco, botões Confirmar/Cancelar/WhatsApp funcionais, criação manual
+- ✅ **Configurações editáveis pelo tenant** (Sprint 5): identidade (nome/cor/logo), gestão de `business_hours` (7 dias × toggles + horários + slot duration), bloqueios manuais (`slot_blocks`)
+- ✅ **Backup automatizado** (Sprint 1): `backup-supabase.sh` + `restore-supabase.sh` + `systemd timer` diário 03:30, rotação 30 dias, primeiro backup validado
+- ✅ **Runbook de emergência** (Sprint 1): `docs/runbook.md` cobrindo pânico / rollback / restore / reset de senha / renovação de cert / operação Uptime Kuma
+- ✅ **Segurança de metadata** (Sprint 1): removido "Create Next App", OpenGraph + Twitter cards, `viewport-fit=cover`, `themeColor`
+- ✅ **Área do Cliente** (Sprint 8): login self-service via magic link em `/entrar`, `/minhas-reservas` com listagem agrupada (Próximas/Histórico), detalhe + cancelamento, download `.ics`, vínculo automático de novas reservas para clientes logados, resgate de reservas anônimas (form manual com WhatsApp + auto-vínculo por email pós-magic-link), header navegacional discreto e pré-requisitos documentados em runbook seções 7-8. Imagem `parrilla-booking:sprint8.1`
 
 ## O que está em andamento
 
-- 🔧 **Auditoria e roadmap**: relatório de auditoria entregue (em `~/.claude/plans/twinkly-enchanting-tide.md`); aguardando aprovação para iniciar Sprint 1 — responsável: AntropIA — previsão: 19/04
-- 🔧 **Validação dos templates de planejamento** preenchidos com o estado real do projeto — responsável: AntropIA — previsão: 19/04
+- 🔧 **Uptime Kuma — configuração da UI**: infra deployada em `uptime.parilla8187.antrop-ia.com` com cert Let's Encrypt, mas falta criar conta admin + adicionar 3 monitores HTTP (`/`, `/reservar`, `/admin/login`) + conectar canal Telegram/Slack — responsável: AntropIA — previsão: pré-demo (5 min)
+- 🔧 **Detecção proativa de abuso** (Sprint 6, parcial): `audit_log` já registra eventos, mas falta regra ativa "> 5 reservas do mesmo IP em 10 min → alerta" e UI `/admin/audit` — responsável: AntropIA — previsão: a definir
+- 🔧 **Demo com o cliente**: roteiro pronto (ver abaixo), aguardando confirmação de data
 
 ## O que falta
 
-### Bloqueante para go-live (curto prazo)
+### Pré-demo (agora, 5–10 min)
 
-- 🔴 **Sprint 1 — Saneamento de segurança** (1-2h): remover/proteger `/api/debug/*`, corrigir metadata default ("Create Next App"), rate limiting básico em endpoints públicos — previsão: 21/04
-- 🔴 **Sprint 2 — Admin funcional** (4-6h): converter `reservas/page.tsx` para ler do banco, conectar KPIs do dashboard a queries reais, implementar handlers de Confirmar/Cancelar/WhatsApp, modal de criação manual de reserva — previsão: 23/04
-- 🔴 **Trocar senha do admin** antes de entregar credenciais ao cliente — previsão: junto com Sprint 2
+- 🔴 **Smoke test no celular** em `/reservar`: fluxo de 4 telas + captcha + Beto + admin reflete a reserva
+- 🔴 **Uptime Kuma**: conta + 3 monitores + canal de notificação (Telegram/Slack/WhatsApp)
+- 🔴 **(Opcional) Limpar dados de teste**: 1 reserva + 2 conversas Beto — se cliente preferir demo zerado
+
+### Antes de entregar ao cliente
+
+- 🔴 **Credenciais via canal seguro** (1Password / Vaultwarden / WhatsApp efêmero):
+  - URL: `https://reservas.parilla8187.antrop-ia.com`
+  - Admin: `https://reservas.parilla8187.antrop-ia.com/admin/login`
+  - Email: `admin@parrilla8187.com.br`
+  - Senha: guardada no cofre (ver docs internos)
+
+### Roteiro de demo sugerido (5–7 min, ordem de maior impacto)
+
+1. Abrir `/reservar` no celular → explicar fluxo de 4 telas, 30 segundos por reserva
+2. Meio do fluxo → tocar no botão Beto → perguntar "qual picanha pra 4 pessoas" → mostrar streaming
+3. Em outro dispositivo, abrir `/admin` → mostrar a reserva recém-feita no dashboard
+4. `/admin/configuracoes` → mudar cor de marca ao vivo → refresh mostra nova cor
+5. `/admin/configuracoes/horarios` → fechar domingo → `/reservar` num domingo fica vazio
+6. `/admin/configuracoes/bloqueios` → bloquear 25/12 → explicar cobertura de feriados
+7. (Se sobrar tempo) `/admin/reservas` → confirmar/cancelar uma reserva → mostrar botão WhatsApp
+
+### Enquadramento positivo do que ainda não existe
+
+- **Cardápio editável pelo cliente** → ajustes hoje via AntropIA em horas; edição visual está no roadmap (Sprint 6.C, 8h, baixo ROI no momento)
+- **Esqueci minha senha** → reset manual pelo time AntropIA; self-service está planejado (Sprint 5)
+- **Multi-tenant ativo com outros restaurantes** → arquitetura pronta, ativação é uma tarde de dev (Sprint 5.D)
+- **Pipeline CI/CD** → deploy hoje é manual mas documentado no runbook; automação está no backlog (Sprint 4)
 
 ### Melhorias planejadas (médio prazo)
 
-- 🟡 **Sprint 3 — Persistência do chat do Beto** (3-4h): tabela `beto_conversations`, retomada de conversa via session cookie — previsão: a definir
-- 🟡 **Sprint 4 — Otimização de disponibilidade** (2-3h): migrar cálculo para função PL/pgSQL, timezone-aware, cache de 60s — previsão: a definir
-- 🟡 **Sprint 5 — Configurações editáveis** (2h): editar nome/cor/logo do tenant, gerenciar `business_hours` e `slot_blocks` — previsão: a definir
-- 🟡 **Sprint 6 — Anti-abuso** (2-3h): captcha (Cloudflare Turnstile), limite de reservas por telefone, log de eventos suspeitos — previsão: a definir
+- 🟡 **Sprint 4 — Performance & CI/CD** (7h): migrar `getAvailability()` para PL/pgSQL, cache HTTP de 60s na API de slots, pipeline GitHub Actions → Swarm
+- 🟡 **Sprint 5 — Auto-serviço restante** (8h): fluxo "esqueci minha senha", resolver de tenant dinâmico, onboarding documentado
+- 🟡 **Sprint 6.C — Cardápio editável** (1d): migrar de constante TypeScript para tabelas `menu_categories` + `menu_items` + UI admin
 
 ## Bloqueios
 
-Nenhum bloqueio técnico no momento.
+Nenhum bloqueio técnico. **Aguardando do lado cliente**: data da demo, confirmação dos pontos focais (dono / gestor de sala / ponto focal técnico), decisão sobre go-live público oficial.
 
-**Aguardando do lado cliente**: confirmação dos pontos focais (nome/contato dos responsáveis Parrilla 8187 — proprietário, gestor de sala, ponto focal técnico) e definição da data oficial de go-live público.
+## URLs de produção
+
+| URL | Função |
+|---|---|
+| `https://reservas.parilla8187.antrop-ia.com/` | Página pública (redireciona para `/reservar`) |
+| `https://reservas.parilla8187.antrop-ia.com/reservar` | Fluxo de reserva: 4 telas + Beto + captcha |
+| `https://reservas.parilla8187.antrop-ia.com/entrar` | Login do cliente final (magic link) |
+| `https://reservas.parilla8187.antrop-ia.com/minhas-reservas` | Área autenticada do cliente — lista, detalhe, cancelar |
+| `https://reservas.parilla8187.antrop-ia.com/admin/login` | Entrada admin |
+| `https://reservas.parilla8187.antrop-ia.com/admin` | Dashboard com KPIs reais |
+| `https://reservas.parilla8187.antrop-ia.com/admin/reservas` | CRUD de reservas + WhatsApp |
+| `https://reservas.parilla8187.antrop-ia.com/admin/configuracoes` | Identidade da marca + links para horários/bloqueios |
+| `https://uptime.parilla8187.antrop-ia.com` | Monitoring interno (Uptime Kuma) |
+
+## Defesas ativas em produção
+
+- Captcha Turnstile no formulário público
+- Rate limit em `/api/reservar/slots`, `/api/reservar`, `/api/beto/chat`, `requestLoginLink` (3/min por IP) e `resgatarReserva` (5/min por user)
+- Validação de WhatsApp (10–13 dígitos + prefixo 55)
+- Limite de 3 reservas futuras ativas por número
+- Audit log persistindo eventos de bloqueio (`rate_limit_*`, `reservation_rejected_*`)
+- Backup diário com restore testado
+- Middleware protegendo `/admin/*` e `/minhas-reservas/*`
+- RLS Postgres: cliente logado só enxerga reservas com `user_id = auth.uid()`
+- TLS via Let's Encrypt com renovação automática
 
 ## Última atualização
 
-19/04/2026 — por AntropIA
+21/04/2026 — por AntropIA
 
 ## Próxima revisão
 
-26/04/2026 _(após conclusão dos Sprints 1 e 2)_
+28/04/2026 _(pós-demo com o cliente — registrar feedback recebido e iterar Sprint 4/5)_

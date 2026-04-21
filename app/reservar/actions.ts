@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
 import { createReservation } from '@/app/lib/reservations'
-import { createAdminClient } from '@/app/lib/supabase/server'
+import { createAdminClient, createClient } from '@/app/lib/supabase/server'
 import { logAuditEvent } from '@/app/lib/audit'
 import { verifyTurnstileToken } from '@/app/lib/turnstile'
 
@@ -77,6 +77,13 @@ export async function createReservationAction(
       return { ok: false, error: 'Escolha um espaço do restaurante' }
     }
 
+    // Sprint 8 I-06: se o cliente esta logado, vincula a reserva ao user_id.
+    // Anonimo segue funcionando (userId fica null no insert).
+    const ssr = await createClient()
+    const {
+      data: { user },
+    } = await ssr.auth.getUser()
+
     const result = await createReservation({
       tenantId: ctx.tenantId,
       establishmentId: ctx.establishmentId,
@@ -85,6 +92,7 @@ export async function createReservationAction(
       status: 'confirmed',
       source: 'public',
       spaceId: input.spaceId,
+      userId: user?.id ?? null,
       guest: input.dados,
       client: createAdminClient(),
     })

@@ -14,9 +14,11 @@ type Screen = 'booking' | 'horarios' | 'espaco' | 'dados' | 'confirmacao'
 interface BookingFlowProps {
   dates: DateOption[]
   espacos: EspacoOption[]
+  /** Sprint 8 I-10: usado pra decidir se exibe CTA "salvar reserva na conta" */
+  isAuthenticated: boolean
 }
 
-export function BookingFlow({ dates, espacos }: BookingFlowProps) {
+export function BookingFlow({ dates, espacos, isAuthenticated }: BookingFlowProps) {
   const [screen, setScreen] = useState<Screen>('booking')
   const [partySize, setPartySize] = useState<string>('2')
   const [dateIndex, setDateIndex] = useState<number>(0)
@@ -29,6 +31,7 @@ export function BookingFlow({ dates, espacos }: BookingFlowProps) {
     nome: string
     codigo: string
     ocasiao?: string
+    email?: string
   } | null>(null)
   const [resetKey, setResetKey] = useState<number>(0)
 
@@ -63,6 +66,8 @@ export function BookingFlow({ dates, espacos }: BookingFlowProps) {
           espaco={selectedEspacoName}
           codigo={confirmation.codigo}
           ocasiao={confirmation.ocasiao}
+          email={confirmation.email}
+          showSaveAccountCta={!isAuthenticated}
           onNovaReserva={resetFlow}
         />
       ) : screen === 'dados' ? (
@@ -84,6 +89,7 @@ export function BookingFlow({ dates, espacos }: BookingFlowProps) {
                 nome: dados.nome,
                 codigo: result.codigo,
                 ocasiao: dados.ocasiao,
+                email: dados.email,
               })
               setScreen('confirmacao')
             }

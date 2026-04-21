@@ -1,9 +1,15 @@
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/app/lib/supabase/server'
 import { parseGuestContact, reservationCodigo } from '@/app/lib/reservations'
-import { formatLocalDate, formatLocalTime, turnoFromDate } from '@/app/lib/date'
+import {
+  formatLocalDate,
+  formatLocalTime,
+  friendlyRelativeDate,
+  todayInTimezone,
+  turnoFromDate,
+} from '@/app/lib/date'
 import { MinhasReservasView, type MinhaReserva } from './MinhasReservasView'
-import { signOutCliente } from '@/app/entrar/actions'
+import { PublicHeader } from '@/app/_components/PublicHeader'
 
 export const metadata = {
   title: 'Minhas reservas',
@@ -51,6 +57,7 @@ export default async function MinhasReservasPage({ searchParams }: PageProps) {
     .limit(100)
 
   const now = new Date()
+  const today = todayInTimezone(timezone)
   const reservas: MinhaReserva[] = (rows ?? []).map((r) => {
     const slot = new Date(r.slot_start)
     const contact = parseGuestContact(r.guest_contact)
@@ -60,7 +67,7 @@ export default async function MinhasReservasPage({ searchParams }: PageProps) {
       id: r.id,
       codigo: reservationCodigo(r.id),
       slotStartISO: slot.toISOString(),
-      dateLabel: formatLocalDate(slot, timezone),
+      dateLabel: friendlyRelativeDate(formatLocalDate(slot, timezone), today),
       timeLabel: formatLocalTime(slot, timezone),
       turno: turnoFromDate(slot, timezone),
       pessoas: contact.pessoas ?? 0,
@@ -83,12 +90,14 @@ export default async function MinhasReservasPage({ searchParams }: PageProps) {
     .sort((a, b) => b.slotStartISO.localeCompare(a.slotStartISO))
 
   return (
-    <MinhasReservasView
-      userEmail={user.email ?? ''}
-      proximas={proximas}
-      historico={historico}
-      resgatarCodigo={params.resgatar ?? null}
-      signOut={signOutCliente}
-    />
+    <>
+      <PublicHeader showMinhasReservas={false} />
+      <MinhasReservasView
+        userEmail={user.email ?? ''}
+        proximas={proximas}
+        historico={historico}
+        resgatarCodigo={params.resgatar ?? null}
+      />
+    </>
   )
 }

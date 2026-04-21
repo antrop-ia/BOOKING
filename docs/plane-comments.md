@@ -2,7 +2,222 @@
 
 Para cada issue abaixo, **mude o status para o indicado** e **cole o comentario** na caixa de comentarios da issue. Os comentarios sao curtos, falam o que foi feito, e apontam o commit + arquivos de referencia.
 
-Ordem: do mais recente (Sprint 6) para o mais antigo (Sprint 1), agrupado por module do Plane.
+Ordem: do mais recente (Sprint 8) para o mais antigo (Sprint 1), agrupado por module do Plane.
+
+---
+
+## Area do Cliente (Sprint 8)
+
+> Imagem deployada: `parrilla-booking:sprint8.1` (build local, sha e26702c1603c).
+> SHA do commit das issues I-05 a I-10: **<SHA-A-DEFINIR-NO-COMMIT>**
+
+### Issue: **I-01 — Schema: user_id em reservations + RLS cliente**
+Status → **Done**
+```
+Entregue no commit 6538705 + migration aplicada manualmente no Supabase
+em 21/04/2026 (Dashboard -> SQL Editor).
+
+Migration: supabase/migrations/20260421_reservations_user_id.sql
+- Coluna user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL
+  (nullable — reservas anonimas continuam validas)
+- Index parcial em (user_id, slot_start DESC) WHERE user_id IS NOT NULL
+- Policy "users see own reservations" (SELECT autenticado WHERE
+  user_id = auth.uid()) — aditiva, nao substitui policy de admin
+- Migration idempotente (IF NOT EXISTS / DROP POLICY IF EXISTS)
+
+Validado: query do final retorna 'reservations.user_id ready' + count
+das reservas existentes (todas com user_id NULL — esperado).
+```
+
+---
+
+### Issue: **I-02 — Autenticacao: paginas de login + callback magic link**
+Status → **Done**
+```
+Entregue no commit 6538705.
+
+Arquivos:
+- app/entrar/page.tsx: tela com form, preserva ?redirect= e ?resgatar=
+  vindo do middleware. Redireciona pra /minhas-reservas se ja logado.
+- app/entrar/LoginForm.tsx: client component, validacao regex de email,
+  feedback "Link enviado" pos-submit.
+- app/entrar/actions.ts: requestLoginLink rate-limited (3/min por IP),
+  signInWithOtp({ shouldCreateUser: true }), callback URL preserva
+  redirect+resgatar. Tambem exporta signOutCliente.
+- app/entrar/callback/route.ts: exchangeCodeForSession + redirect.
+  Sprint 8 I-10 adicionou auto-resgate por email quando vem com
+  ?resgatar=.
+
+Tema dark Parrilla coerente com /reservar. Sem dependencia externa nova
+— reusa Supabase Auth (mesmo padrao do admin).
+```
+
+---
+
+### Issue: **I-03 — Middleware: protecao de /minhas-reservas/***
+Status → **Done**
+```
+Entregue no commit 6538705.
+
+middleware.ts:
+- Matcher inclui /minhas-reservas e /minhas-reservas/:path*
+- Bloco novo (linhas 68-84): se nao ha sessao Supabase, redirect pra
+  /entrar?redirect=<path-original com search preservado>
+- /entrar e /entrar/callback nao sao matched pelo middleware (sao
+  publicos por design)
+- Admin segue com sua propria checagem (membership no layout)
+```
+
+---
+
+### Issue: **I-04 — Pagina "Minhas reservas" (listagem)**
+Status → **Done**
+```
+Entregue no commit 6538705. Pequeno fix de UX (label de data) no commit
+<SHA-A-DEFINIR-NO-COMMIT>.
+
+- app/minhas-reservas/page.tsx: server component, getUser obrigatorio,
+  filtra reservations por user_id = auth.uid() via admin client (RLS
+  cobre, mas admin client e usado pra resolver timezone e join com
+  establishment_spaces). Agrupa em Proximas e Historico.
+- app/minhas-reservas/MinhasReservasView.tsx: client component, dark
+  Parrilla, cards com data, hora (DM Mono), turno, pessoas, espaco com
+  emoji, ocasiao e status badge. Empty state amigavel + borda amarela
+  destacando a proxima reserva mais proxima.
+- Fix de UX: dateLabel agora usa friendlyRelativeDate ("Hoje" / "Amanha"
+  / "sex, 24 abr") em vez de YYYY-MM-DD cru.
+```
+
+---
+
+### Issue: **I-05 — Detalhe da reserva + cancelamento**
+Status → **Done**
+```
+Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+
+Novos arquivos:
+- app/minhas-reservas/[codigo]/page.tsx: server, regex valida formato
+  P8187-XXXX, lookup por uuid prefix + ownership (user_id=auth.uid()).
+  Trata colisao de prefixo (>1 row -> notFound).
+- app/minhas-reservas/[codigo]/actions.ts: cancelOwnReservation com
+  ownership dupla (getUser + UPDATE filtrado por user_id), retorna 0
+  rows se ja cancelada / nao e do user.
+- app/minhas-reservas/[codigo]/ReservaDetailView.tsx: client, dark
+  Parrilla, exibe data/hora destacada + detalhes em rows.
+- app/lib/ics.ts: gerador minimo .ics RFC5545 para "Adicionar ao
+  calendario" (data URL base64).
+
+Botoes:
+- Adicionar ao calendario (download .ics)
+- Falar com o restaurante (renderizado so se RESTAURANT_INFO.whatsapp
+  estiver preenchido — hoje null, espera o cliente confirmar o numero
+  oficial)
+- Cancelar reserva (confirm + transition + atualizacao otimista de
+  status local)
+```
+
+---
+
+### Issue: **I-06 — Vincular nova reserva ao usuario logado**
+Status → **Done**
+```
+Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+
+- app/reservar/actions.ts: createReservationAction agora chama
+  createClient + getUser ANTES de createReservation, e passa user.id
+  como userId.
+- app/lib/reservations.ts: CreateReservationParams ganha campo
+  userId?: string | null; insert grava user_id = params.userId ?? null.
+
+Fluxo anonimo continua intacto (userId fica null).
+```
+
+---
+
+### Issue: **I-07 — Resgatar reserva feita antes do cadastro**
+Status → **Done**
+```
+Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+
+- app/minhas-reservas/actions.ts (NOVO): resgatarReserva({ codigo,
+  whatsapp }) com rate limit 5/min por user.id. Valida codigo P8187-XXXX,
+  busca por uuid prefix + user_id IS NULL, compara WhatsApp normalizado
+  contra guest_contact, UPDATE com filtro is('user_id', null) anti-race.
+  Mensagens de erro especificas (ja vinculada a outra conta / nao
+  encontrada / WhatsApp invalido).
+- app/minhas-reservas/MinhasReservasView.tsx: nova ResgatarSection com
+  botao "+ Adicionar reserva existente" que expande inline em form.
+  Quando ?resgatar=CODIGO chega via URL (vindo do CTA pos-confirmacao),
+  o form ja abre com o codigo prepopulado.
+
+Tambem exporta tryAutoResgateByEmail usado pelo I-10 (auto-vinculo via
+ownership de email apos magic link).
+```
+
+---
+
+### Issue: **I-08 — Header navegacional com login/logout**
+Status → **Done**
+```
+Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+
+Decisao de design (registrar): em vez de header full-width que duplicaria
+o branding ja existente em BookingScreen e MinhasReservasView, criamos
+um *pill flutuante* (position: fixed, top-right) discreto que nao
+interfere com o layout existente.
+
+- app/_components/PublicHeader.tsx: server component, le getUser. Se
+  logado: pill "Minhas reservas" (opcional via prop) + botao "Sair"
+  (form action signOutCliente). Se nao: pill "Entrar". Sem JS extra
+  (form action funciona via SSR).
+- Aplicado em /reservar (page.tsx), /minhas-reservas (page.tsx) e
+  /minhas-reservas/[codigo] (page.tsx). Nao aplicado em /, /entrar,
+  /admin (cada um tem motivo proprio).
+- Removido header inline duplicado de MinhasReservasView (botao SAIR
+  vivia ali; agora vive no PublicHeader).
+```
+
+---
+
+### Issue: **I-09 — Email template customizado (magic link)**
+Status → **Done** *(apenas apos editar no Supabase Dashboard)*
+```
+HTML template salvo em docs/email-templates/magic-link.html para
+versionamento.
+
+Como aplicar:
+1. Abrir Supabase Dashboard -> Authentication -> Email Templates
+2. Selecionar "Magic Link"
+3. Subject: "Seu acesso a Parrilla 8187 esta pronto"
+4. Cole o conteudo de docs/email-templates/magic-link.html
+5. Salvar
+6. Validar: rodar /entrar em producao com email pessoal -> verificar
+   inbox
+
+Documentado em docs/runbook.md secao "Templates de email Supabase".
+```
+
+---
+
+### Issue: **I-10 — CTA "Salvar reserva na minha conta" pos-confirmacao**
+Status → **Done**
+```
+Entregue no commit <SHA-A-DEFINIR-NO-COMMIT>.
+
+- app/reservar/_components/ConfirmacaoScreen.tsx: novo card discreto
+  acima do botao "Nova reserva", visivel so se nao logado
+  (showSaveAccountCta). Botao linka pra /entrar?email=X&resgatar=CODIGO.
+- app/reservar/BookingFlow.tsx: thread email no estado de confirmacao
+  e propaga showSaveAccountCta = !isAuthenticated.
+- app/reservar/page.tsx: le getUser server-side e passa
+  isAuthenticated=Boolean(user) pro BookingFlow.
+- app/entrar/callback/route.ts: se vier ?resgatar=, chama
+  tryAutoResgateByEmail (vincula a reserva quando o email do guest_contact
+  bate com o user.email — ownership ja provado pelo magic link).
+  ?resgatar= so e preservado no redirect final se o auto-vinculo falhou
+  (assim o aviso "use o form" e o form expandido so aparecem quando
+  precisa de ajuda manual).
+```
 
 ---
 

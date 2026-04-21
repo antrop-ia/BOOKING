@@ -1,0 +1,78 @@
+<!--
+  Sprint 8 — I-09. Template de "Magic Link" do Supabase Auth, customizado
+  para a Parrilla 8187. Para aplicar:
+
+    Supabase Dashboard -> Authentication -> Email Templates -> Magic Link
+    Subject: "Seu acesso à Parrilla 8187 está pronto"
+    Body:    cole o HTML abaixo
+
+  Versionado aqui pra ficar reproduzivel se o template for sobrescrito
+  no Dashboard. Ver tambem: docs/runbook.md -> "Templates de email Supabase".
+
+  Variavel disponivel: {{ .ConfirmationURL }} — link com code+redirect que
+  o usuario clica pra logar. Nao mexa.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#0A0906;font-family:'DM Sans','Helvetica Neue',Arial,sans-serif;color:#F0E8D8;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0A0906;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background-color:#161410;border:1px solid rgba(255,255,255,0.06);border-radius:8px;overflow:hidden;">
+            <tr>
+              <td align="center" style="padding:32px 24px 12px;">
+                <div style="display:inline-block;width:60px;height:60px;border-radius:50%;border:2px solid #F5C042;line-height:56px;font-size:11px;font-weight:700;color:#F5C042;letter-spacing:0.04em;">
+                  P 8187
+                </div>
+                <div style="margin-top:14px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#F5C042;">
+                  Parrilla 8187
+                </div>
+                <div style="margin-top:4px;font-size:11px;color:#7A6A50;">
+                  Bar e Churrascaria · Boa Viagem, Recife
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 4px;">
+                <h1 style="margin:0;font-size:22px;font-weight:700;color:#F0E8D8;letter-spacing:-0.01em;">
+                  Seu acesso está pronto
+                </h1>
+                <p style="margin:14px 0 22px;font-size:14px;line-height:1.55;color:#9B9385;">
+                  Clique no botão abaixo pra entrar na sua área e gerenciar suas reservas. O link vale pela próxima 1 hora.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" style="padding:6px 0 22px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;background-color:#F5C042;color:#0A0906;font-weight:700;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;padding:14px 28px;border-radius:4px;">
+                        Entrar na Parrilla
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 6px;font-size:11px;color:#7A6A50;line-height:1.55;">
+                  Se o botão não funcionar, copie e cole esse link no navegador:
+                </p>
+                <p style="margin:0 0 22px;font-size:11px;color:#F5C042;word-break:break-all;line-height:1.55;font-family:'DM Mono','Menlo',monospace;">
+                  {{ .ConfirmationURL }}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 28px;border-top:1px solid rgba(255,255,255,0.05);">
+                <p style="margin:0 0 6px;font-size:11px;color:#7A6A50;line-height:1.55;">
+                  Se não foi você que pediu, pode ignorar esse e-mail. Ninguém vai conseguir entrar sem clicar no link.
+                </p>
+                <p style="margin:0;font-size:11px;color:#4A3A24;line-height:1.55;">
+                  — Equipe Parrilla 8187
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:18px 0 0;font-size:10px;color:#4A3A24;letter-spacing:0.04em;">
+            Parrilla 8187 · Av. Boa Viagem, Recife · reservas.parilla8187.antrop-ia.com
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
