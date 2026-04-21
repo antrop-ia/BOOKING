@@ -208,17 +208,118 @@ Feature **extra** sugerida pelo cliente durante a sessão:
 
 ---
 
+### `2200fc7` · 19:12 · **docs: status semanal, commits comentados e plano da Área do Cliente**
+
+Preparação documental antes do Sprint 8. Criou:
+
+- `docs/commits-comentados.md` (este arquivo) — timeline do projeto até espaços
+- `docs/status-semanal.md` — snapshot operacional da semana
+- `docs/login-cliente-plan.md` — design completo do Sprint 8 (I-01 a I-10)
+- `plane-import-login.csv` — 10 issues importáveis no Plane (Sprint 8)
+
+**Entregou**: plano técnico detalhado para a Área do Cliente antes de escrever qualquer código.
+
+---
+
+### `6538705` · 19:27 · **feat: Sprint 8 core — login do cliente final (I-01 a I-04)**
+
+Primeira metade do Sprint 8. Stack de autenticação self-service em 35 minutos:
+
+**I-01 — Schema + RLS**
+- Migration `20260421_reservations_user_id.sql`: coluna `user_id uuid` nullable com FK `auth.users(id) ON DELETE SET NULL`
+- Index parcial em `(user_id, slot_start DESC) WHERE user_id IS NOT NULL` (otimiza "Minhas reservas" sem inchar)
+- Policy aditiva `users see own reservations` (SELECT autenticado `WHERE user_id = auth.uid()`) — não substitui RLS de admin
+
+**I-02 — Páginas de login**
+- `/entrar`: form com validação regex de email, preserva `?redirect=` e `?resgatar=`
+- `/entrar/callback/route.ts`: `exchangeCodeForSession` + redirect
+- `requestLoginLink` rate-limited (3/min por IP), `signInWithOtp({ shouldCreateUser: true })`
+- Tema dark Parrilla coerente com `/reservar`, zero dep nova
+
+**I-03 — Middleware**
+- Matcher estendido para `/minhas-reservas` e `/minhas-reservas/:path*`
+- Sem sessão → redirect pra `/entrar?redirect=<path>` preservando query original
+
+**I-04 — Listagem**
+- `/minhas-reservas`: server component, filtra `reservations` por `user_id = auth.uid()`, agrupa em **Próximas** e **Histórico**
+- `MinhasReservasView`: dark Parrilla, cards com data relativa ("Hoje" / "Amanhã" / "sex, 24 abr"), hora em DM Mono, turno, pessoas, espaço com emoji, ocasião, status badge, borda amarela destacando a próxima reserva
+
+**Entregou**: cliente final consegue fazer login via magic link e ver suas próprias reservas — completamente self-service, sem contato com o admin.
+
+---
+
+### `47ff6eb` · 20:45 · **feat: Sprint 8 entrega final — detalhe, cancelamento e resgate (I-05 a I-10)**
+
+Segunda metade do Sprint 8. 21 arquivos, +2029/−110. Fecha a Área do Cliente:
+
+**I-05 — Detalhe + cancelamento**
+- `/minhas-reservas/[codigo]`: regex valida `P8187-XXXX`, lookup por UUID prefix + ownership dupla (trata colisão → `notFound`)
+- `cancelOwnReservation` com filtro `eq('user_id', user.id)` — prova dupla no server action
+- `ReservaDetailView`: dark Parrilla, exibe data/hora destacada + detalhes em rows, botões Calendar / WhatsApp (condicional) / Cancelar
+- `app/lib/ics.ts`: gerador RFC5545 minimal para `.ics` (data URL base64)
+
+**I-06 — Vínculo automático**
+- `createReservation` aceita `userId?: string | null`; insert grava `user_id = params.userId ?? null`
+- `createReservationAction` chama `getUser` antes de criar e passa `user?.id ?? null` — fluxo anônimo intacto
+
+**I-07 — Resgate manual**
+- `app/minhas-reservas/actions.ts`: `resgatarReserva` com rate limit 5/min por user, valida código, compara WhatsApp normalizado, `UPDATE ... WHERE user_id IS NULL` anti-race
+- Mensagens específicas: "já vinculada a outra conta" / "não encontrada" / "WhatsApp inválido"
+- `ResgatarSection` na `MinhasReservasView`: botão `+ Adicionar reserva existente`, form expande inline, prepopula código via `?resgatar=`
+
+**I-08 — PublicHeader**
+- `app/_components/PublicHeader.tsx`: pill flutuante (`position: fixed`, top-right), server component, sem JS extra
+- Se logado: "Minhas reservas" (condicional via prop) + "Sair" (form action `signOutCliente`); se não: "Entrar"
+- Aplicado em `/reservar`, `/minhas-reservas`, `/minhas-reservas/[codigo]` — fora de `/`, `/entrar`, `/admin`
+- Cabeçalho inline duplicado de `MinhasReservasView` removido (botão Sair migrou pra cá)
+
+**I-09 — Template de email**
+- `docs/email-templates/magic-link.html`: HTML dark Parrilla com logo P 8187 amarelo e CTA "Entrar na Parrilla"
+- `docs/runbook.md` seção "Templates de email Supabase" explica como aplicar no Dashboard
+
+**I-10 — CTA pós-confirmação + auto-resgate**
+- `ConfirmacaoScreen`: card discreto "Salvar reserva na minha conta", visível só se não logado, linka pra `/entrar?email=X&resgatar=CODIGO`
+- `BookingFlow` threads `email` no estado; `/reservar/page.tsx` lê `getUser` e passa `isAuthenticated`
+- `/entrar/callback`: se vier `?resgatar=`, chama `tryAutoResgateByEmail` — vincula quando `guest_contact.email === user.email` (ownership provado pelo magic link); só preserva `?resgatar=` no redirect se o auto-vínculo falhou
+
+**Bônus**: `app/lib/beto/menu.ts` ganha `RESTAURANT_INFO` tipado + campo `whatsapp: string | null` (consumido pelo botão "Falar com o restaurante" em `/minhas-reservas/[codigo]`).
+
+**Build**: `next build` 10.8s compile + 10.8s TypeScript, 13 páginas geradas, zero erros.
+
+**Entregou**: Área do Cliente completa. Reserva anônima → CTA pós-confirmação → magic link → auto-vínculo invisível → detalhe com `.ics` + cancelamento em 3 clicks. Atrito zero para quem não quer conta; continuidade entre dispositivos para quem quer.
+
+---
+
+### `31caa35` · 20:45 · **docs: preencher SHA do Sprint 8 I-05 a I-10 em plane-comments**
+
+Commit técnico obrigatório — resolve as 7 ocorrências de `<SHA-A-DEFINIR-NO-COMMIT>` em `docs/plane-comments.md` pelo SHA curto `47ff6eb`. Necessário como commit separado porque o SHA do commit anterior não existia até ele acontecer (e o projeto proíbe `--amend`).
+
+**Entregou**: `docs/plane-comments.md` pronto para colar no Plane sem placeholders.
+
+---
+
+### `0c5133b` · 20:52 · **docs: atualizar status e roadmap pós fechamento do Sprint 8**
+
+Sincroniza os docs de status com a realidade pós Sprint 8:
+
+- `02_Status-e-Andamento.md`: bullet da Área do Cliente cita os 3 commits (`6538705` + `47ff6eb` + `31caa35`); pré-demo ganha 3 bloqueadores explícitos (deploy `sprint8.2`, template de email no Supabase, update do Plane); smoke test descreve o fluxo novo (reserva → CTA → magic link → auto-vínculo → detalhe → `.ics`/cancelar); rodapé vira "21/04/2026 (tarde)"
+- `03_Roadmap-e-Proximos-Passos.md`: Fase 2 e Fase 3 marcadas como `[x] Concluída` com SHAs; Sprint 6 quebrado em 6.A (`fcf7bcf`) + 6.B (`76115bc`) + detecção proativa (aberto) + 6.C (aberto); nova **Fase 5 (add-on) — Área do Cliente** listando I-01 a I-10; "Próximos passos imediatos" reescrito com 6 ações concretas (deploy + template + Plane + smoke + Uptime Kuma + demo)
+
+**Entregou**: docs navegáveis sem precisar de contexto da conversa — qualquer pessoa que abrir o projeto amanhã entende onde parou.
+
+---
+
 ## Estatísticas finais
 
 | Métrica | Valor |
 |---|---|
-| Commits no master | 13 |
+| Commits no master | 18 |
 | Dias de desenvolvimento efetivo | 2 (17/04 + 21/04) |
-| Migrations SQL | 3 (`beto_conversations`, `audit_log`, `establishment_spaces`) |
-| Linhas de código adicionadas | ~5.000 |
-| Sprints entregues integralmente | 1, 2, 3, 6.A, 6.B |
-| Sprints parciais | 5 (A+B sim, C+D não) |
-| Feature extra entregue | Espaços do restaurante |
+| Migrations SQL | 4 (`beto_conversations`, `audit_log`, `establishment_spaces`, `reservations_user_id`) |
+| Linhas de código adicionadas | ~8.100 |
+| Sprints entregues integralmente | 1, 2, 3, 5, 6.A, 6.B, 8 |
+| Sprints parciais | 6 (detecção proativa + 6.C cardápio pendentes) |
+| Features extras entregues | Espaços do restaurante (21/04); Área do Cliente / Sprint 8 (21/04) |
 
 ## Timeline visual
 
@@ -229,7 +330,7 @@ Feature **extra** sugerida pelo cliente durante a sessão:
 ├─ 11:48  e2c17ba  Booking flow 4 telas
 └─ 12:01  02be3b1  Beto
 
-21/04
+21/04 (madrugada e manhã)
 ├─ 05:06  27fb257  Production-ready (Docker Swarm, Sprint 1+2)
 ├─ 05:07  aa6f1e4  Docs (runbook, templates, CSV Plane)
 ├─ 16:01  5cdb946  Sprint 3 (chat persistente)
@@ -239,8 +340,18 @@ Feature **extra** sugerida pelo cliente durante a sessão:
 ├─ 18:11  76115bc  Sprint 6.B (captcha Turnstile)
 ├─ 18:26  afecc18  Docs (comentários Plane)
 └─ 18:46  66a8055  Espaços do restaurante
+
+21/04 (noite — Área do Cliente)
+├─ 19:12  2200fc7  Docs (status semanal + plano do Sprint 8)
+├─ 19:27  6538705  Sprint 8 core (I-01 a I-04: schema + login + middleware + lista)
+├─ 20:45  47ff6eb  Sprint 8 final (I-05 a I-10: detalhe + cancelar + resgate + header + email + CTA)
+├─ 20:45  31caa35  Docs (SHA resolvido em plane-comments)
+└─ 20:52  0c5133b  Docs (status + roadmap sincronizados)
 ```
 
 **Produto em produção**: `https://reservas.parilla8187.antrop-ia.com`
 **Admin**: `https://reservas.parilla8187.antrop-ia.com/admin/login`
+**Área do cliente**: `https://reservas.parilla8187.antrop-ia.com/entrar`
 **Monitoring**: `https://uptime.parilla8187.antrop-ia.com`
+
+> **Pendente de deploy**: os commits `47ff6eb` + `31caa35` + `0c5133b` ainda não estão em produção. A imagem em ar hoje (`parrilla-booking:sprint8.1`) cobre até `6538705`. Rebuild + push + redeploy da `sprint8.2` é o próximo passo operacional.
