@@ -5,11 +5,13 @@ const BETO_COOKIE = 'beto_session'
 const BETO_MAX_AGE = 60 * 60 * 24 * 30 // 30 dias
 
 /**
- * Middleware centraliza 2 responsabilidades:
- *   1. /reservar — garante o cookie beto_session (sem forcar a pagina a
- *      ser dinamica, o HTML continua cacheado; so o Set-Cookie e adicionado).
- *   2. /admin/* — exige sessao Supabase Auth valida, redirect para /admin/login
- *      quando nao houver.
+ * Middleware centraliza 3 responsabilidades:
+ *   1. /reservar + /api/beto/* — garante o cookie beto_session (sem forcar
+ *      a pagina a ser dinamica).
+ *   2. /admin/* — exige sessao Supabase Auth valida, redirect para
+ *      /admin/login quando nao houver.
+ *   3. /minhas-reservas/* — exige sessao do cliente final (Sprint 8),
+ *      redirect para /entrar quando nao houver.
  */
 
 function ensureBetoCookie(request: NextRequest, response: NextResponse): NextResponse {
@@ -24,12 +26,32 @@ function ensureBetoCookie(request: NextRequest, response: NextResponse): NextRes
   return response
 }
 
+function buildSupabaseClient(request: NextRequest, response: NextResponse) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Rotas publicas que usam o Beto — garante o cookie beto_session.
-  // Cobre tanto a pagina quanto as API routes do chat, porque Route Handlers
-  // em Next.js 16 Edge nao conseguem criar cookies de forma confiavel.
+  // Beto / reservar — so setar cookie
   if (
     pathname === '/reservar' ||
     pathname.startsWith('/reservar/') ||
@@ -43,30 +65,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Resto de /admin exige auth
-  let response = NextResponse.next({ request })
+  // Cliente final: proteger /minhas-reservas/*
+  if (pathname === '/minhas-reservas' || pathname.startsWith('/minhas-reservas/')) {
+    let response = NextResponse.next({ request })
+    const supabase = buildSupabaseClient(request, response)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
+    if (!user) {
+      const redirectUrl = new URL('/entrar', request.url)
+      // Preserva a rota original pra voltar apos o login
+      redirectUrl.searchParams.set('redirect', pathname + request.nextUrl.search)
+      return NextResponse.redirect(redirectUrl)
     }
-  )
 
+    return response
+  }
+
+  // Resto de /admin exige auth via membership (ja validado no layout via resolveAdminTenantContext)
+  let response = NextResponse.next({ request })
+  const supabase = buildSupabaseClient(request, response)
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -85,5 +104,7 @@ export const config = {
     '/reservar/:path*',
     '/api/beto/:path*',
     '/admin/:path*',
+    '/minhas-reservas',
+    '/minhas-reservas/:path*',
   ],
 }
