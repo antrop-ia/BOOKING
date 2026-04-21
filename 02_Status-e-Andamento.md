@@ -45,7 +45,7 @@ A plataforma está em produção em `https://reservas.parilla8187.antrop-ia.com`
 - ✅ **Backup automatizado** (Sprint 1): `backup-supabase.sh` + `restore-supabase.sh` + `systemd timer` diário 03:30, rotação 30 dias, primeiro backup validado
 - ✅ **Runbook de emergência** (Sprint 1): `docs/runbook.md` cobrindo pânico / rollback / restore / reset de senha / renovação de cert / operação Uptime Kuma
 - ✅ **Segurança de metadata** (Sprint 1): removido "Create Next App", OpenGraph + Twitter cards, `viewport-fit=cover`, `themeColor`
-- ✅ **Área do Cliente** (Sprint 8): login self-service via magic link em `/entrar`, `/minhas-reservas` com listagem agrupada (Próximas/Histórico), detalhe + cancelamento, download `.ics`, vínculo automático de novas reservas para clientes logados, resgate de reservas anônimas (form manual com WhatsApp + auto-vínculo por email pós-magic-link), header navegacional discreto e pré-requisitos documentados em runbook seções 7-8. Imagem `parrilla-booking:sprint8.1`
+- ✅ **Área do Cliente** (Sprint 8): login self-service via magic link em `/entrar`, `/minhas-reservas` com listagem agrupada (Próximas/Histórico), detalhe + cancelamento, download `.ics`, vínculo automático de novas reservas para clientes logados, resgate de reservas anônimas (form manual com WhatsApp + auto-vínculo por email pós-magic-link), header navegacional discreto e pré-requisitos documentados em runbook seções 7-8. Commits: `6538705` (core I-01 a I-04) + `47ff6eb` (entrega final I-05 a I-10) + `31caa35` (preenchimento de SHA nos comentários do Plane). Próximo passo de deploy: rebuild da imagem como `parrilla-booking:sprint8.2` (a `sprint8.1` em produção cobre apenas até `6538705`).
 
 ## O que está em andamento
 
@@ -57,7 +57,10 @@ A plataforma está em produção em `https://reservas.parilla8187.antrop-ia.com`
 
 ### Pré-demo (agora, 5–10 min)
 
-- 🔴 **Smoke test no celular** em `/reservar`: fluxo de 4 telas + captcha + Beto + admin reflete a reserva
+- 🔴 **Deploy da imagem `sprint8.2`**: rebuild + push da imagem cobrindo os commits `47ff6eb` + `31caa35` (Sprint 8 entrega final) + redeploy no Swarm. Em produção hoje ainda roda `sprint8.1` no SHA `6538705`.
+- 🔴 **Aplicar template de email no Supabase**: Dashboard → Authentication → Email Templates → Magic Link, colar `docs/email-templates/magic-link.html`. Até isso acontecer, a issue I-09 fica em `In Progress`.
+- 🔴 **Atualizar Plane**: colar os 10 comentários de `docs/plane-comments.md` nas issues I-01 a I-10 e mover status (Done, exceto I-09 enquanto o template não subir).
+- 🔴 **Smoke test no celular** em `/reservar`: fluxo de 4 telas + captcha + Beto + admin reflete a reserva. Novo caminho Sprint 8: reserva anônima → CTA "Salvar na minha conta" → magic link → auto-vínculo invisível em `/minhas-reservas` → abrir detalhe → testar `.ics` e cancelar.
 - 🔴 **Uptime Kuma**: conta + 3 monitores + canal de notificação (Telegram/Slack/WhatsApp)
 - 🔴 **(Opcional) Limpar dados de teste**: 1 reserva + 2 conversas Beto — se cliente preferir demo zerado
 
@@ -124,7 +127,7 @@ Nenhum bloqueio técnico. **Aguardando do lado cliente**: data da demo, confirma
 
 ## Última atualização
 
-21/04/2026 — por AntropIA
+21/04/2026 (tarde) — por AntropIA. Mudanças desde a atualização anterior do dia: fechamento do Sprint 8 com commits `47ff6eb` (feat I-05 a I-10) e `31caa35` (docs — SHA preenchido em `plane-comments`). Build passou local (`next build` 10.8s). Deploy da imagem `sprint8.2` e aplicação do template de email pendentes.
 
 ## Próxima revisão
 
