@@ -134,6 +134,33 @@ Entregas:
 
 ---
 
+## Fase 6 (add-on) — Notificações WhatsApp e admin editável (Sprint 9)
+
+**Objetivo:** Dar ao restaurante autonomia total sobre as opções operacionais e avisar o staff em tempo real quando uma reserva nova chega. Deploy de stack Evolution API dedicada + admin UI pra configurar tudo (número que recebe, template, toggle on/off).
+**Período:** 28/04 → 05/05 _(estimado)_
+**Status:** [ ] Não iniciada  [ ] Em andamento  [ ] Concluída
+
+Entregas:
+
+- [ ] **9.A — Infra Evolution API dedicada** (~3h) — stack Swarm isolada + Traefik + Basic Auth
+- [ ] **9.B — Backup da sessão WhatsApp** (~1h) — incluir volume Evolution no backup diário
+- [ ] **9.C — Schema `notification_settings` + `notification_log`** (~1h)
+- [ ] **9.D — Admin UI `/admin/configuracoes/notificacoes`** (~4h) — toggle + staff_numbers + template + preview + teste
+- [ ] **9.E — Cliente HTTP `app/lib/notifications.ts`** (~3h) — `sendWhatsAppText` + `renderTemplate`
+- [ ] **9.F — Hook `notifyNewReservation`** (~3h) — chamado após insert, best-effort, grava log
+- [ ] **9.G — UI histórico + botão reenviar** (~2h)
+- [ ] **9.H — Runbook da Evolution API** (~1h)
+
+Ver plano completo em `docs/sprint9-notificacoes-whatsapp.md` e issues importáveis em `plane-import-sprint9.csv`.
+
+**Decisões pendentes antes de começar** (perguntar ao cliente):
+- Número(s) que recebem notificação — um ou lista?
+- Template padrão inicial
+- Notificações pro cliente (fase 2?) ou só pro staff?
+- Manager UI público (Basic Auth) ou só SSH tunnel?
+
+---
+
 ## Próximos passos imediatos
 
 Ações concretas a executar agora:
