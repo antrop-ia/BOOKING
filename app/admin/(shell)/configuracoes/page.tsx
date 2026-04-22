@@ -46,6 +46,11 @@ export default async function ConfiguracoesPage() {
           title="Espaços do restaurante"
           description="Salão interno, varanda, terraço… o cliente escolhe ao reservar."
         />
+        <SettingCard
+          href="/admin/configuracoes/notificacoes"
+          title="Notificações WhatsApp"
+          description="Avisa o staff quando chega reserva nova. Evolution API dedicada."
+        />
       </div>
     </section>
   )

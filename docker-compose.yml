@@ -10,6 +10,8 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://0.0.0.0:3000"]
       interval: 30s

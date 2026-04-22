@@ -152,6 +152,19 @@ Plataforma de Reservas Online + Atendente IA "Beto"
 - **Motivo:** Ownership do email já foi provado pelo magic link (Supabase Auth) — exigir WhatsApp seria redundante. Falha silenciosa garante que o caminho manual continua disponível e não há cenário de "vínculo errado" porque o match é estrito por email.
 - **Risco descartado:** Alguém compartilhar a URL de confirmação. Para reivindicar, atacante precisaria ter acesso ao email da reserva — o mesmo que faria login normal — então o ataque não adiciona superfície.
 
+### D-047 — Evolution API dedicada para notificações WhatsApp (21/04/2026)
+
+- **Contexto:** Sprint 9 precisa disparar mensagem WhatsApp para a equipe do restaurante quando chega reserva nova. Existe instância Evolution compartilhada rodando na SmartFlow, mas mudar configuração/API key lá impacta outros produtos.
+- **Decisão:** Subir stack dedicada `parrilla-evolution` no Swarm (api + postgres + redis) em `minha_rede`. Manager UI exposta em `evolution.parilla8187.antrop-ia.com` com Basic Auth via Traefik; API interna acessada pelo Next via `http://parrilla-evolution-api:8080`. `AUTHENTICATION_API_KEY` em `/etc/parrilla-booking/evolution.env` (0600). Hook `notifyNewReservation` é best-effort com try/catch (mesma filosofia do `audit.ts`): falha silenciosa, nunca derruba a reserva — cada tentativa é registrada em `notification_log`.
+- **Motivo:** Isolamento (SmartFlow permanece intacto), propriedade clara do estado da sessão WhatsApp (volume `parrilla_evolution_instances` vai no backup diário), e liberdade para evoluir API key/template sem coordenação com outros produtos.
+- **Descartado:** Reutilizar a instância da SmartFlow (mistura tenants), Twilio (custo mensal + contrato), OTP nativo Meta Business API (exige aprovação do WhatsApp + custo).
+
+### D-048 — 9º module 'Admin editável & notificações' + 8º cycle Sprint 9 (21/04/2026)
+
+- **Contexto:** Seguindo o mesmo raciocínio do D-043 (Área do Cliente), a Sprint 9 entrega (a) stack Evolution nova + (b) UI admin de notificações + (c) hook na criação de reserva. Agrupar isso em algum dos 7 canônicos (Painel Admin, Infraestrutura & DevOps) dilui visibilidade.
+- **Decisão:** Criar 9º module `Admin editável & notificações` + 8º cycle `Sprint 9 - Notificações WhatsApp` (28/04 → 05/05) só no BOOK. Futuras sprints de notificação/WhatsApp de outros tenants também ficarão neste module.
+- **Motivo:** Quem abre o BOOK vê a feature inteira agrupada. O template applier AntropIA segue inalterado — outros projetos continuam 7 modules + 6 cycles.
+
 ---
 
 ## 6. Pendências de decisão
