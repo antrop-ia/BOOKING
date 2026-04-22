@@ -57,8 +57,10 @@ A plataforma está em produção em `https://reservas.parilla8187.antrop-ia.com`
 
 ### Pré-demo (agora, 5–10 min)
 
-- ✅ **Deploy da imagem `sprint8.2`** (21/04 noite): imagem `e5272aa6adb7` cobrindo commits `47ff6eb` + `31caa35` + `0c5133b` + `d6eab26` em produção. Rollout convergiu zero-downtime; `sprint8.1` mantida pra rollback.
-- ✅ **Template de email Supabase aplicado** (21/04 noite): magic link agora sai com identidade Parrilla (logo P 8187 amarelo, tema dark) — I-09 Done.
+- ✅ **Deploy da imagem `sprint8.3`** (21/04 noite): imagem `ce8a1a72f7b6` em produção cobrindo até commit `f045f1f`. Rollout convergiu zero-downtime; `sprint8.2` e `sprint8.1` mantidas pra rollback.
+- ✅ **Template de email Supabase aplicado** (21/04 noite): magic link sai com identidade Parrilla — I-09 Done.
+- ✅ **Fix de host em redirects** (21/04 noite, commit `f045f1f`): Next 16 standalone atrás do Traefik usava `HOSTNAME=0.0.0.0` ao construir URLs de redirect, mandando usuário pra `https://0.0.0.0:3000/minhas-reservas` após o magic link. Novo helper `app/lib/public-url.ts` lê `x-forwarded-host` + `x-forwarded-proto`. Aplicado no callback do Supabase e no middleware.
+- ✅ **Smoke test end-to-end validado** (21/04 noite): magic link → callback no host público → `/minhas-reservas` OK.
 - 🔴 **Atualizar Plane**: colar os 10 comentários de `docs/plane-comments.md` nas issues I-01 a I-10 e mover todas para Done.
 - 🔴 **Smoke test no celular** em `/reservar`: fluxo de 4 telas + captcha + Beto + admin reflete a reserva. Novo caminho Sprint 8: reserva anônima → CTA "Salvar na minha conta" → magic link → auto-vínculo invisível em `/minhas-reservas` → abrir detalhe → testar `.ics` e cancelar.
 - 🔴 **Uptime Kuma**: conta + 3 monitores + canal de notificação (Telegram/Slack/WhatsApp)

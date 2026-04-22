@@ -346,7 +346,10 @@ Sincroniza os docs de status com a realidade pós Sprint 8:
 ├─ 19:27  6538705  Sprint 8 core (I-01 a I-04: schema + login + middleware + lista)
 ├─ 20:45  47ff6eb  Sprint 8 final (I-05 a I-10: detalhe + cancelar + resgate + header + email + CTA)
 ├─ 20:45  31caa35  Docs (SHA resolvido em plane-comments)
-└─ 20:52  0c5133b  Docs (status + roadmap sincronizados)
+├─ 20:52  0c5133b  Docs (status + roadmap sincronizados)
+├─ 21:00  d6eab26  Docs (commits-comentados com Sprint 8)
+├─ 21:12  0bc0988  Docs (deploy sprint8.2 + template Supabase)
+└─ 22:15  f045f1f  Fix (X-Forwarded-Host nos redirects — sprint8.3)
 ```
 
 **Produto em produção**: `https://reservas.parilla8187.antrop-ia.com`
