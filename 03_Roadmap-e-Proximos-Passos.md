@@ -116,7 +116,7 @@ Entregas:
 
 **Objetivo:** Dar ao cliente final (hóspede) uma conta com histórico de reservas, cancelamento self-service e vínculo automático de novas reservas. Entrega completa em 1 sprint.
 **Período:** 21/04/2026
-**Status:** [x] Concluída _(pendente: aplicar template de email no Supabase e deploy da imagem `sprint8.2`)_
+**Status:** [x] Concluída _(deploy da `sprint8.2` + template de email aplicados em 21/04/2026 noite)_
 
 Entregas:
 
@@ -138,10 +138,10 @@ Entregas:
 
 Ações concretas a executar agora:
 
-- [ ] **Deploy da imagem `parrilla-booking:sprint8.2`** — cobre os commits `47ff6eb` + `31caa35` que ficam de fora da `sprint8.1` atual em produção — responsável: AntropIA — prazo: hoje
-- [ ] **Aplicar template de email no Supabase** — Dashboard → Authentication → Email Templates → Magic Link, colar `docs/email-templates/magic-link.html` — responsável: AntropIA — prazo: hoje (bloqueia fechamento da I-09)
-- [ ] **Atualizar Plane** — colar os 10 comentários de `docs/plane-comments.md` e mover status — responsável: AntropIA — prazo: hoje
-- [ ] **Smoke test end-to-end do Sprint 8** em produção — reserva anônima → CTA "Salvar na minha conta" → magic link → auto-vínculo → detalhe → `.ics` + cancelar — responsável: AntropIA — prazo: pós-deploy
+- [x] **Deploy da imagem `parrilla-booking:sprint8.2`** — imagem `e5272aa6adb7` em produção em 21/04 (noite); rollout zero-downtime
+- [x] **Aplicar template de email no Supabase** — template Parrilla aplicado no Dashboard em 21/04 (noite); I-09 Done
+- [ ] **Atualizar Plane** — colar os 10 comentários de `docs/plane-comments.md` e mover status para Done — responsável: AntropIA — prazo: hoje
+- [ ] **Smoke test end-to-end do Sprint 8** em produção — reserva anônima → CTA "Salvar na minha conta" → magic link → auto-vínculo → detalhe → `.ics` + cancelar — responsável: AntropIA — prazo: hoje
 - [ ] **Uptime Kuma** — 5 min de UI (conta + 3 monitores + canal) — responsável: AntropIA — prazo: pré-demo
 - [ ] **Agendar demo end-to-end com o cliente** — responsável: PO AntropIA — prazo: 28/04
 

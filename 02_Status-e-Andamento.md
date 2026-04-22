@@ -57,9 +57,9 @@ A plataforma está em produção em `https://reservas.parilla8187.antrop-ia.com`
 
 ### Pré-demo (agora, 5–10 min)
 
-- 🔴 **Deploy da imagem `sprint8.2`**: rebuild + push da imagem cobrindo os commits `47ff6eb` + `31caa35` (Sprint 8 entrega final) + redeploy no Swarm. Em produção hoje ainda roda `sprint8.1` no SHA `6538705`.
-- 🔴 **Aplicar template de email no Supabase**: Dashboard → Authentication → Email Templates → Magic Link, colar `docs/email-templates/magic-link.html`. Até isso acontecer, a issue I-09 fica em `In Progress`.
-- 🔴 **Atualizar Plane**: colar os 10 comentários de `docs/plane-comments.md` nas issues I-01 a I-10 e mover status (Done, exceto I-09 enquanto o template não subir).
+- ✅ **Deploy da imagem `sprint8.2`** (21/04 noite): imagem `e5272aa6adb7` cobrindo commits `47ff6eb` + `31caa35` + `0c5133b` + `d6eab26` em produção. Rollout convergiu zero-downtime; `sprint8.1` mantida pra rollback.
+- ✅ **Template de email Supabase aplicado** (21/04 noite): magic link agora sai com identidade Parrilla (logo P 8187 amarelo, tema dark) — I-09 Done.
+- 🔴 **Atualizar Plane**: colar os 10 comentários de `docs/plane-comments.md` nas issues I-01 a I-10 e mover todas para Done.
 - 🔴 **Smoke test no celular** em `/reservar`: fluxo de 4 telas + captcha + Beto + admin reflete a reserva. Novo caminho Sprint 8: reserva anônima → CTA "Salvar na minha conta" → magic link → auto-vínculo invisível em `/minhas-reservas` → abrir detalhe → testar `.ics` e cancelar.
 - 🔴 **Uptime Kuma**: conta + 3 monitores + canal de notificação (Telegram/Slack/WhatsApp)
 - 🔴 **(Opcional) Limpar dados de teste**: 1 reserva + 2 conversas Beto — se cliente preferir demo zerado

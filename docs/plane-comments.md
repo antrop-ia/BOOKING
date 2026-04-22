@@ -180,19 +180,16 @@ interfere com o layout existente.
 ---
 
 ### Issue: **I-09 — Email template customizado (magic link)**
-Status → **Done** *(apenas apos editar no Supabase Dashboard)*
+Status → **Done**
 ```
-HTML template salvo em docs/email-templates/magic-link.html para
-versionamento.
+Template aplicado no Supabase Dashboard em 21/04/2026 (noite).
 
-Como aplicar:
-1. Abrir Supabase Dashboard -> Authentication -> Email Templates
-2. Selecionar "Magic Link"
-3. Subject: "Seu acesso a Parrilla 8187 esta pronto"
-4. Cole o conteudo de docs/email-templates/magic-link.html
-5. Salvar
-6. Validar: rodar /entrar em producao com email pessoal -> verificar
-   inbox
+HTML versionado em docs/email-templates/magic-link.html.
+
+Aplicacao:
+- Supabase Dashboard -> Authentication -> Email Templates -> Magic Link
+- Subject: "Seu acesso a Parrilla 8187 esta pronto"
+- Body: conteudo de docs/email-templates/magic-link.html
 
 Documentado em docs/runbook.md secao "Templates de email Supabase".
 ```
