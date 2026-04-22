@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/app/lib/supabase/server'
 import { tryAutoResgateByEmail } from '@/app/minhas-reservas/actions'
+import { publicUrl } from '@/app/lib/public-url'
 
 /**
  * Recebe o redirect do magic link do Supabase Auth.
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/entrar?error=link_invalido', request.url)
+      publicUrl('/entrar?error=link_invalido', request.headers)
     )
   }
 
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error('[entrar/callback] exchange error', error)
     return NextResponse.redirect(
-      new URL('/entrar?error=link_expirado', request.url)
+      publicUrl('/entrar?error=link_expirado', request.headers)
     )
   }
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
   // So preserva ?resgatar= se NAO conseguiu auto-vincular — assim o form
   // manual e o aviso so aparecem quando precisa de ajuda do user.
-  const finalUrl = new URL(redirectTo, request.url)
+  const finalUrl = publicUrl(redirectTo, request.headers)
   if (resgatar && !autoVinculou) finalUrl.searchParams.set('resgatar', resgatar)
 
   return NextResponse.redirect(finalUrl)

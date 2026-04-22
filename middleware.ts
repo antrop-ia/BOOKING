@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { publicUrl } from '@/app/lib/public-url'
 
 const BETO_COOKIE = 'beto_session'
 const BETO_MAX_AGE = 60 * 60 * 24 * 30 // 30 dias
@@ -74,7 +75,7 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      const redirectUrl = new URL('/entrar', request.url)
+      const redirectUrl = publicUrl('/entrar', request.headers)
       // Preserva a rota original pra voltar apos o login
       redirectUrl.searchParams.set('redirect', pathname + request.nextUrl.search)
       return NextResponse.redirect(redirectUrl)
@@ -91,7 +92,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    const redirectUrl = new URL('/admin/login', request.url)
+    const redirectUrl = publicUrl('/admin/login', request.headers)
     return NextResponse.redirect(redirectUrl)
   }
 
