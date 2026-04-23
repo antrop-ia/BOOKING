@@ -219,11 +219,22 @@ export function NotificacoesView({ initial, evolutionConfigured, canEdit, logs }
           <button
             onClick={handleRequestQR}
             disabled={pending || !canEdit || !form.instance_name}
-            className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+            title={
+              !form.instance_name
+                ? 'Defina o nome da instância mais abaixo e clique Salvar antes de gerar o QR.'
+                : undefined
+            }
+            className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-500/20 disabled:opacity-50"
           >
             Gerar QR code
           </button>
         </div>
+        {!form.instance_name ? (
+          <p className="mt-2 text-xs text-amber-600">
+            Preencha o <strong>nome da instância</strong> abaixo e clique{' '}
+            <strong>Salvar</strong> antes de gerar o QR code.
+          </p>
+        ) : null}
         {status.qrcodeBase64 ? (
           <div className="mt-4 flex flex-col items-center rounded bg-white p-4">
             <img
