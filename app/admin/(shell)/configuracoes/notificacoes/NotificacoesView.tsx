@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   updateNotificationSettings,
   checkInstanceStatus,
@@ -63,6 +63,47 @@ export function NotificacoesView({ initial, evolutionConfigured, canEdit, logs }
     instanceName: initial.instance_name,
   })
   const [pending, startTransition] = useTransition()
+  const toastRef = useRef<typeof showToast | null>(null)
+  toastRef.current = showToast
+
+  // Poll do status enquanto estiver mostrando QR code — para assim que
+  // o WhatsApp parear (state vira 'open'). 4s e janela maxima 3 min.
+  useEffect(() => {
+    if (!status.qrcodeBase64) return
+    if (status.state === 'open') return
+
+    let active = true
+    let elapsed = 0
+    const interval = setInterval(async () => {
+      elapsed += 4
+      if (!active) return
+      if (elapsed > 180) {
+        // timeout: para de polar pra nao martelar a API eternamente
+        clearInterval(interval)
+        return
+      }
+      const r = await checkInstanceStatus()
+      if (!active || !r.ok || !r.data) return
+      if (r.data.state === 'open') {
+        clearInterval(interval)
+        setStatus({
+          loading: false,
+          state: 'open',
+          qrcodeBase64: null,
+          instanceName: r.data.instanceName,
+          evolutionConfigured: r.data.evolutionConfigured,
+        })
+        toastRef.current?.('ok', '✅ WhatsApp conectado com sucesso')
+      } else if (r.data.state !== status.state) {
+        setStatus((s) => ({ ...s, state: r.data!.state }))
+      }
+    }, 4000)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [status.qrcodeBase64, status.state])
 
   function showToast(kind: 'ok' | 'err', msg: string) {
     setToast({ kind, msg })
