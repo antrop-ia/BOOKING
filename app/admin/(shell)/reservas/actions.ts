@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/app/lib/supabase/server'
 import { resolveAdminTenantContext } from '@/app/lib/tenant'
 import { createReservation } from '@/app/lib/reservations'
+import { notifyGuestConfirmation, notifyNewReservation } from '@/app/lib/notifications'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -96,6 +97,32 @@ export async function createManualReservation(
   })
 
   if (!result.ok) return { ok: false, error: result.error }
+
+  // Sprint 9: notificações WhatsApp também aqui (criação manual). Best-effort.
+  // Pega timezone do estabelecimento — fallback America/Recife.
+  const { data: estTz } = await admin
+    .from('establishments')
+    .select('timezone')
+    .eq('id', est.id)
+    .maybeSingle()
+  const timezone = estTz?.timezone ?? 'America/Recife'
+
+  await Promise.all([
+    notifyNewReservation({
+      reservationId: result.reservationId,
+      tenantId: ctx.tenantId,
+      establishmentId: est.id,
+      timezone,
+      client: admin,
+    }),
+    notifyGuestConfirmation({
+      reservationId: result.reservationId,
+      tenantId: ctx.tenantId,
+      establishmentId: est.id,
+      timezone,
+      client: admin,
+    }),
+  ])
 
   revalidatePath('/admin/reservas')
   revalidatePath('/admin')

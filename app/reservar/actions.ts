@@ -7,7 +7,7 @@ import { createReservation } from '@/app/lib/reservations'
 import { createAdminClient, createClient } from '@/app/lib/supabase/server'
 import { logAuditEvent } from '@/app/lib/audit'
 import { verifyTurnstileToken } from '@/app/lib/turnstile'
-import { notifyNewReservation } from '@/app/lib/notifications'
+import { notifyGuestConfirmation, notifyNewReservation } from '@/app/lib/notifications'
 
 const TENANT_SLUG = 'parrilla8187'
 const ESTABLISHMENT_SLUG = 'boa-viagem'
@@ -127,15 +127,25 @@ export async function createReservationAction(
       details: { reservationId: result.reservationId, partySize },
     })
 
-    // Sprint 9: notificação WhatsApp pro staff. Best-effort — nunca
-    // derruba o fluxo da reserva; cada tentativa é logada em notification_log.
-    await notifyNewReservation({
-      reservationId: result.reservationId,
-      tenantId: ctx.tenantId,
-      establishmentId: ctx.establishmentId,
-      timezone: ctx.timezone,
-      client: createAdminClient(),
-    })
+    // Sprint 9: notificações WhatsApp. Best-effort, nunca derruba o fluxo.
+    // Roda em paralelo: staff + cliente. Cada tentativa entra em notification_log.
+    const notifyClient = createAdminClient()
+    await Promise.all([
+      notifyNewReservation({
+        reservationId: result.reservationId,
+        tenantId: ctx.tenantId,
+        establishmentId: ctx.establishmentId,
+        timezone: ctx.timezone,
+        client: notifyClient,
+      }),
+      notifyGuestConfirmation({
+        reservationId: result.reservationId,
+        tenantId: ctx.tenantId,
+        establishmentId: ctx.establishmentId,
+        timezone: ctx.timezone,
+        client: notifyClient,
+      }),
+    ])
 
     return { ok: true, codigo: result.codigo, reservationId: result.reservationId }
   } catch {

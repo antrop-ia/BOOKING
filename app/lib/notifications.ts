@@ -19,6 +19,8 @@ export interface NotificationSettings {
   instance_name: string | null
   staff_numbers: string[]
   template_new_reservation: string
+  notify_guest: boolean
+  template_guest_confirmation: string
 }
 
 /**
@@ -325,5 +327,83 @@ export async function notifyNewReservation(
   } catch (err) {
     // Best-effort: falha silenciosa. Log para dev.
     console.error('[notifyNewReservation] silent failure', err)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// notifyGuestConfirmation — manda WhatsApp pro proprio cliente
+// ─────────────────────────────────────────────────────────────────
+// Best-effort: nao deve quebrar o fluxo. Le o WhatsApp do guest_contact
+// e envia o template_guest_confirmation. Toggle independente
+// (notify_guest) e do enabled — admin pode ter notificacao staff
+// rodando e desligar a do cliente, ou vice-versa.
+
+export async function notifyGuestConfirmation(
+  params: NotifyNewReservationParams
+): Promise<void> {
+  try {
+    const { data: settings } = await params.client
+      .from('notification_settings')
+      .select('*')
+      .eq('tenant_id', params.tenantId)
+      .maybeSingle()
+
+    if (!settings || !settings.notify_guest) return
+    if (!settings.instance_name) return
+    if (!isEvolutionConfigured()) return
+
+    const { data: res } = await params.client
+      .from('reservations')
+      .select(`
+        id,
+        slot_start,
+        guest_name,
+        guest_contact,
+        establishment_spaces ( name, icon )
+      `)
+      .eq('id', params.reservationId)
+      .single()
+
+    if (!res) return
+
+    const parsed = parseGuestContact(res.guest_contact ?? undefined)
+    if (!parsed.whatsapp) return // cliente nao informou WhatsApp -> abandona
+
+    const rawSpace = res.establishment_spaces as
+      | { name: string; icon: string | null }[]
+      | { name: string; icon: string | null }
+      | null
+    const space = Array.isArray(rawSpace) ? rawSpace[0] ?? null : rawSpace
+
+    const ctx = buildContextFromReservation(
+      {
+        id: res.id,
+        slot_start: res.slot_start,
+        guest_name: res.guest_name,
+        guest_contact: res.guest_contact,
+        space_name: space?.name ?? null,
+        space_icon: space?.icon ?? null,
+      },
+      params.timezone
+    )
+    const text = renderTemplate(settings.template_guest_confirmation, ctx)
+
+    const sendResult = await sendWhatsAppText({
+      to: parsed.whatsapp,
+      text,
+      instanceName: settings.instance_name,
+    })
+
+    await params.client.from('notification_log').insert({
+      tenant_id: params.tenantId,
+      reservation_id: params.reservationId,
+      event_type: 'guest_confirmation',
+      target_number: parsed.whatsapp,
+      status: sendResult.ok ? 'sent' : 'failed',
+      error: sendResult.ok ? null : sendResult.error,
+      response: (sendResult.ok ? sendResult.response : sendResult.response) ?? null,
+    })
+  } catch (err) {
+    console.error('[notifyGuestConfirmation] silent failure', err)
   }
 }

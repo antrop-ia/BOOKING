@@ -7,8 +7,11 @@ import { NotificacoesView } from './NotificacoesView'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_TEMPLATE =
+const DEFAULT_TEMPLATE_STAFF =
   '🎉 Nova reserva\n\n{nome} ({pessoas} pessoas)\n📅 {data} às {hora}\n📍 {espaco}\n💬 {ocasiao}\n\nCódigo: {codigo}'
+
+const DEFAULT_TEMPLATE_GUEST =
+  'Olá {nome}! 🎉\n\nSua reserva na Parrilla 8187 foi confirmada:\n\n📅 {data} às {hora}\n👥 {pessoas} pessoas\n📍 {espaco}\n\nCódigo: {codigo}\n\nQualquer ajuste, é só chamar.'
 
 export default async function NotificacoesPage() {
   const ctx = await resolveAdminTenantContext()
@@ -55,7 +58,10 @@ export default async function NotificacoesPage() {
           instance_name: settings?.instance_name ?? '',
           staff_numbers: settings?.staff_numbers ?? [],
           template_new_reservation:
-            settings?.template_new_reservation ?? DEFAULT_TEMPLATE,
+            settings?.template_new_reservation ?? DEFAULT_TEMPLATE_STAFF,
+          notify_guest: settings?.notify_guest ?? false,
+          template_guest_confirmation:
+            settings?.template_guest_confirmation ?? DEFAULT_TEMPLATE_GUEST,
         }}
         evolutionConfigured={isEvolutionConfigured()}
         canEdit={canEdit}

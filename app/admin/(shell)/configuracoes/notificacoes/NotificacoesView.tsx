@@ -409,7 +409,71 @@ export function NotificacoesView({ initial, evolutionConfigured, canEdit, logs }
             {renderPreview(form.template_new_reservation)}
           </pre>
         </details>
+      </section>
 
+      {/* Confirmação ao cliente */}
+      <section className="space-y-4 rounded border border-neutral-200 bg-white p-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-900">
+            Confirmação ao cliente
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Manda WhatsApp pro número que o hóspede informou na reserva, logo após
+            ela ser criada (público ou criada manualmente no admin).
+          </p>
+        </div>
+
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={form.notify_guest}
+            onChange={(e) => setForm({ ...form, notify_guest: e.target.checked })}
+            disabled={!canEdit}
+            className="h-4 w-4"
+          />
+          <span className="text-sm">Enviar confirmação automática ao cliente</span>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Template da confirmação
+          </span>
+          <textarea
+            value={form.template_guest_confirmation}
+            onChange={(e) =>
+              setForm({ ...form, template_guest_confirmation: e.target.value })
+            }
+            disabled={!canEdit}
+            rows={7}
+            className="mt-1 w-full rounded border border-neutral-200 bg-white px-3 py-2 font-mono text-xs"
+          />
+          <span className="mt-1 block text-xs text-neutral-500">
+            Mesmas variáveis do template do staff. {'{nome}'} aparece como o nome
+            que o cliente informou.
+          </span>
+        </label>
+
+        <details className="rounded border border-neutral-200 bg-neutral-50 p-3">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-neutral-600">
+            Preview
+          </summary>
+          <pre className="mt-2 whitespace-pre-wrap text-xs text-neutral-800">
+            {renderPreview(form.template_guest_confirmation)}
+          </pre>
+        </details>
+
+        <p className="text-xs text-neutral-500">
+          ℹ️ Não há botão "enviar teste" aqui porque a mensagem vai pro número
+          que o cliente informou — pra testar, faça uma reserva real no{' '}
+          <a href="/reservar" className="underline">
+            /reservar
+          </a>
+          .
+        </p>
+      </section>
+
+      {/* Ações globais */}
+      <section className="space-y-3">
         <div className="flex gap-3">
           <button
             onClick={save}
@@ -423,7 +487,7 @@ export function NotificacoesView({ initial, evolutionConfigured, canEdit, logs }
             disabled={pending || !canEdit}
             className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
           >
-            Enviar teste
+            Enviar teste (staff)
           </button>
         </div>
       </section>

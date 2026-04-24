@@ -23,6 +23,8 @@ export interface NotificationSettingsInput {
   instance_name: string
   staff_numbers: string[]
   template_new_reservation: string
+  notify_guest: boolean
+  template_guest_confirmation: string
 }
 
 function assertManager() {
@@ -77,7 +79,12 @@ export async function updateNotificationSettings(
 
   const template = input.template_new_reservation.trim()
   if (template.length < 10 || template.length > 1000) {
-    return { ok: false, error: 'Template precisa ter entre 10 e 1000 caracteres' }
+    return { ok: false, error: 'Template (staff) precisa ter entre 10 e 1000 caracteres' }
+  }
+
+  const guestTemplate = input.template_guest_confirmation.trim()
+  if (guestTemplate.length < 10 || guestTemplate.length > 1000) {
+    return { ok: false, error: 'Template (cliente) precisa ter entre 10 e 1000 caracteres' }
   }
 
   const admin = createAdminClient()
@@ -90,6 +97,8 @@ export async function updateNotificationSettings(
         instance_name: instance || null,
         staff_numbers: normalized,
         template_new_reservation: template,
+        notify_guest: input.notify_guest,
+        template_guest_confirmation: guestTemplate,
       },
       { onConflict: 'tenant_id' }
     )
