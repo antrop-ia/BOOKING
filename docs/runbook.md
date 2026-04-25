@@ -27,8 +27,11 @@ Algo quebrou em producao.
 ├── Certificado HTTPS expirou?
 │   └── ver [5. Certificado Let's Encrypt]
 │
-└── Uptime Kuma sumiu / esta offline?
-    └── ver [6. Uptime Kuma]
+├── Uptime Kuma sumiu / esta offline?
+│   └── ver [6. Uptime Kuma]
+│
+└── Notificacao WhatsApp parou (staff/cliente)?
+    └── ver [9. Evolution API — notificacoes WhatsApp]
 ```
 
 ---
@@ -400,6 +403,169 @@ nao remover.
 
 ---
 
+## 9. Evolution API — notificacoes WhatsApp
+
+A stack `parrilla-evolution` (3 servicos: api, postgres, redis) hospeda a
+instancia do Baileys que envia WhatsApp pro staff e pro cliente. Sessao
+do WhatsApp persistida no Postgres da Evolution (volume
+`parrilla_evolution_postgres`).
+
+URL interna: `http://parrilla-evolution_api:8080`
+Instancia ativa: `parrilla-8187`
+API key: `EVOLUTION_API_KEY` em `/root/BOOKING/.env`
+
+### 9.1 Diagnostico (30 segundos)
+
+```bash
+# Stack rodando?
+docker service ls | grep parrilla-evolution
+
+# API responde?
+source /root/BOOKING/.env
+docker exec $(docker ps --filter "name=parrilla-booking" -q | head -1) \
+  wget -q -O- --timeout=5 --header="apikey: $EVOLUTION_API_KEY" \
+  "$EVOLUTION_API_URL/" | head -c 200
+
+# Estado da instancia (deve ser "open" se WhatsApp pareado)
+docker exec $(docker ps --filter "name=parrilla-booking" -q | head -1) \
+  wget -q -O- --header="apikey: $EVOLUTION_API_KEY" \
+  "$EVOLUTION_API_URL/instance/connectionState/parrilla-8187"
+```
+
+**Sinais:**
+- `state: open` → tudo certo
+- `state: connecting` → aguardando QR ser escaneado
+- `state: close` → sessao caiu, precisa parear de novo
+- HTTP timeout → stack pode estar parada
+
+### 9.2 Re-parear apos sessao cair
+
+UI:
+1. Login admin -> `/admin/configuracoes/notificacoes`
+2. Botao **"Gerar QR code"** -> escaneia no WhatsApp do staff
+3. Polling automatico atualiza o badge pra "Conectado" em 4-12s
+
+Curl direto (se UI nao responder):
+```bash
+source /root/BOOKING/.env
+docker exec $(docker ps --filter "name=parrilla-booking" -q | head -1) sh -c "
+  wget -q -O- --header='apikey: $EVOLUTION_API_KEY' \
+    '$EVOLUTION_API_URL/instance/connect/parrilla-8187'
+" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('base64','sem QR retornado')[:80])"
+```
+
+### 9.3 Restart da stack Evolution
+
+```bash
+# Restart do servico API (mantem volumes)
+docker service update --force parrilla-evolution_api
+
+# Restart do postgres (cuidado, derruba sessao se sem backup)
+docker service update --force parrilla-evolution_postgres
+```
+
+### 9.4 Backup da sessao
+
+Backup diario as 03:45 -03 via systemd timer:
+
+```bash
+# Status do timer
+systemctl list-timers parrilla-evolution-backup.timer
+
+# Forcar backup agora (uso em emergencia ou pre-mudanca)
+systemctl start parrilla-evolution-backup.service
+
+# Validar arquivo
+ls -lh /var/backups/parrilla-evolution/
+
+# Inspecionar conteudo de um backup
+mkdir /tmp/evobk && cd /tmp/evobk
+tar -xzf /var/backups/parrilla-evolution/evolution-YYYYMMDD-HHMMSS.tar.gz
+cat MANIFEST.txt
+head -30 evolution.sql
+cd - && rm -rf /tmp/evobk
+```
+
+Cada backup contem:
+- `evolution.sql` — pg_dump completo (clean + if-exists, idempotente)
+- `instances.tar.gz` — volume Baileys metadata
+- `MANIFEST.txt`
+
+Retencao: 30 dias. Local: `/var/backups/parrilla-evolution/`.
+
+### 9.5 Restore da sessao (disaster recovery)
+
+**Quando usar:** servidor migrou, postgres da Evolution corrompeu, ou perdeu
+o pareamento e nao quer escanear QR de novo.
+
+```bash
+# 1. Pegar o backup mais recente
+LATEST=$(ls -t /var/backups/parrilla-evolution/evolution-*.tar.gz | head -1)
+echo "Restaurando de: $LATEST"
+
+# 2. Extrair em sandbox
+mkdir -p /tmp/evolution-restore && cd /tmp/evolution-restore
+tar -xzf "$LATEST"
+ls -la  # ver evolution.sql, instances.tar.gz, MANIFEST.txt
+
+# 3. Restaurar pg_dump dentro do container postgres
+PG=$(docker ps --filter "name=parrilla-evolution_postgres" --format "{{.Names}}" | head -1)
+cat evolution.sql | docker exec -i "$PG" psql -U evo -d evolution
+
+# 4. Restaurar volume instances (precisa parar o api antes)
+docker service scale parrilla-evolution_api=0
+docker run --rm \
+  -v parrilla_evolution_instances:/dest \
+  -v $(pwd):/backup \
+  alpine sh -c "cd /dest && tar -xzf /backup/instances.tar.gz"
+docker service scale parrilla-evolution_api=1
+
+# 5. Validar — deve voltar pra "open" sem precisar de QR
+sleep 10
+source /root/BOOKING/.env
+docker exec $(docker ps --filter "name=parrilla-booking" -q | head -1) \
+  wget -q -O- --header="apikey: $EVOLUTION_API_KEY" \
+  "$EVOLUTION_API_URL/instance/connectionState/parrilla-8187"
+
+# Cleanup
+cd / && rm -rf /tmp/evolution-restore
+```
+
+Se o `state` voltar `open`, a sessao foi restaurada com sucesso. Se vier
+`close`, precisa parear de novo via UI (`/admin/configuracoes/notificacoes`).
+
+### 9.6 Reset completo (recriar instancia do zero)
+
+Como ultimo recurso, se nada acima resolver:
+
+```bash
+source /root/BOOKING/.env
+# Deletar instancia
+docker exec $(docker ps --filter "name=parrilla-booking" -q | head -1) sh -c "
+  wget -q -O- --method=DELETE --header='apikey: $EVOLUTION_API_KEY' \
+    '$EVOLUTION_API_URL/instance/delete/parrilla-8187'
+"
+# Recriar via UI: /admin/configuracoes/notificacoes -> "Gerar QR code"
+```
+
+### 9.7 Logs em caso de envio falhar
+
+```bash
+# Logs do container API
+docker service logs parrilla-evolution_api --tail 50
+
+# Logs do app principal (pra ver se notifyNewReservation foi chamado)
+docker service logs parrilla-booking_app --tail 50 2>&1 | grep -i "notify\|evolution"
+
+# Tabela notification_log (rastreia cada tentativa)
+source /root/BOOKING/.env
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/notification_log?select=attempted_at,event_type,target_number,status,error&order=attempted_at.desc&limit=20" \
+  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | python3 -m json.tool
+```
+
+---
+
 ## Apendice — referencias rapidas
 
 ### Locais importantes
@@ -409,15 +575,20 @@ nao remover.
 | Codigo da aplicacao | `/root/BOOKING` |
 | Env vars do app | `/root/BOOKING/.env` |
 | Compose do app | `/root/BOOKING/docker-compose.yml` |
-| Script de backup | `/root/BOOKING/scripts/backup-supabase.sh` |
-| Script de restore | `/root/BOOKING/scripts/restore-supabase.sh` |
+| Script de backup Supabase | `/root/BOOKING/scripts/backup-supabase.sh` |
+| Script de restore Supabase | `/root/BOOKING/scripts/restore-supabase.sh` |
+| Script de backup Evolution | `/root/BOOKING/scripts/backup-evolution.sh` |
 | Credenciais do backup | `/etc/parrilla-booking/backup.env` (0600) |
-| Backups diarios | `/var/backups/parrilla-booking/` |
-| Log do backup | `/var/log/parrilla-backup.log` |
-| Timer do backup | `systemctl status parrilla-backup.timer` |
+| Backups Supabase | `/var/backups/parrilla-booking/` |
+| Backups Evolution | `/var/backups/parrilla-evolution/` |
+| Log do backup Supabase | `/var/log/parrilla-backup.log` |
+| Log do backup Evolution | `/var/log/parrilla-evolution-backup.log` |
+| Timer Supabase | `systemctl status parrilla-backup.timer` (03:30 -03) |
+| Timer Evolution | `systemctl status parrilla-evolution-backup.timer` (03:45 -03) |
 | Uptime Kuma compose | `/root/uptime-kuma/docker-compose.yml` |
 | Traefik dynamic config | `/root/traefik-dynamic/` |
 | Traefik certs storage | volume `volume_swarm_certificates` |
+| Volumes Evolution | `parrilla_evolution_postgres`, `parrilla_evolution_instances`, `parrilla_evolution_redis` |
 
 ### Tenant IDs (para restore e queries manuais)
 
