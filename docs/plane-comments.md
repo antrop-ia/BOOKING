@@ -559,3 +559,46 @@ Nenhuma acao nova — mantem o status Done.
 **Defesas em producao hoje:** rate limit (3 rotas) + validacao WhatsApp + limite por numero + captcha Turnstile + audit log funcionando (35 reqs -> 5 bloqueios registrados no banco).
 
 Produto pronto pra divulgacao publica.
+
+---
+
+## Sprint 5.C — Esqueci minha senha admin (25/04/2026)
+
+> SHA do commit: **72a70ff**
+
+### Issue: **Sprint 5.C — Fluxo "esqueci minha senha" para admin**
+Status → **Done**
+```
+Entregue no commit 72a70ff.
+
+Fluxo self-service: admin pede reset de senha pelo email, recebe
+link do Supabase Auth, define nova senha e e redirecionado pro login.
+
+Arquivos novos:
+- app/admin/esqueci-senha/{page.tsx, EsqueciSenhaForm.tsx, actions.ts}
+  Form pede email, server action chama supabase.auth.resetPasswordForEmail
+  com redirectTo=publicUrl('/admin/redefinir-senha'). Rate limit 3/min/IP
+  e anti-enumeracao (sempre devolve "se o email existir, voce vai
+  receber um link").
+- app/admin/redefinir-senha/{page.tsx, NovaSenhaForm.tsx, actions.ts}
+  Page consome ?code= do email via exchangeCodeForSession; se invalido,
+  redireciona pra /admin/esqueci-senha?error=link_expirado. Form valida
+  8-72 chars + confirmacao. Action chama supabase.auth.updateUser, faz
+  signOut e redireciona /admin/login?success=senha_redefinida pra forcar
+  login limpo com a senha nova.
+
+Arquivos modificados:
+- app/admin/login/page.tsx: mensagem verde de sucesso quando vem
+  ?success=senha_redefinida + link "Esqueci minha senha" abaixo do form.
+- middleware.ts: libera /admin/esqueci-senha e /admin/redefinir-senha
+  como rotas publicas (mesmo bloco do /admin/login).
+
+Smoke test em producao:
+  /admin/login -> 200
+  /admin/esqueci-senha -> 200
+  /admin/redefinir-senha -> 200
+
+Limitacao conhecida: a senha so pode ser trocada pelo proprio admin
+(nao ha fluxo "owner reseta senha de outro admin"). Esse caso seria
+um botao "Pedir reset" na lista de admins, fora do escopo de 5.C.
+```
