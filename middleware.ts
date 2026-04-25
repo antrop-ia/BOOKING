@@ -61,8 +61,12 @@ export async function middleware(request: NextRequest) {
     return ensureBetoCookie(request, NextResponse.next({ request }))
   }
 
-  // Login do admin e publico
-  if (pathname === '/admin/login') {
+  // Rotas publicas do admin (login + reset de senha — Sprint 5.C)
+  if (
+    pathname === '/admin/login' ||
+    pathname === '/admin/esqueci-senha' ||
+    pathname === '/admin/redefinir-senha'
+  ) {
     return NextResponse.next()
   }
 

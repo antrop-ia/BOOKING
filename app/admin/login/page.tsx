@@ -1,11 +1,17 @@
+import Link from 'next/link'
 import { signIn } from './actions'
 
 type PageProps = {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; success?: string }>
+}
+
+const SUCCESS_MESSAGES: Record<string, string> = {
+  senha_redefinida: 'Senha redefinida. Faça login com a nova senha.',
 }
 
 export default async function LoginPage({ searchParams }: PageProps) {
-  const { error } = await searchParams
+  const { error, success } = await searchParams
+  const successMessage = success ? SUCCESS_MESSAGES[success] : null
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-6">
@@ -16,6 +22,12 @@ export default async function LoginPage({ searchParams }: PageProps) {
             Entre com sua conta para gerenciar as reservas
           </p>
         </div>
+
+        {successMessage && (
+          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {successMessage}
+          </div>
+        )}
 
         <form action={signIn} className="space-y-4">
           <div>
@@ -57,6 +69,15 @@ export default async function LoginPage({ searchParams }: PageProps) {
             <p className="pt-2 text-center text-sm text-red-600">{error}</p>
           )}
         </form>
+
+        <div className="mt-6 text-center">
+          <Link
+            href="/admin/esqueci-senha"
+            className="text-xs text-neutral-500 underline hover:text-neutral-900"
+          >
+            Esqueci minha senha
+          </Link>
+        </div>
       </div>
     </div>
   )
