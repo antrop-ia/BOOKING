@@ -602,3 +602,82 @@ Limitacao conhecida: a senha so pode ser trocada pelo proprio admin
 (nao ha fluxo "owner reseta senha de outro admin"). Esse caso seria
 um botao "Pedir reset" na lista de admins, fora do escopo de 5.C.
 ```
+
+---
+
+## Sprint 4 — Disponibilidade robusta + CI (26/04/2026)
+
+> SHAs dos commits: **a4ffc75** (4.1+4.2) + **67ca04d** (4.3)
+
+### Issue: **Migrar getAvailability() para PL/pgSQL**
+Status → **Done**
+```
+Entregue no commit a4ffc75 + migration aplicada manualmente no Supabase
+em 25/04/2026 (Dashboard -> SQL Editor).
+
+Migration: supabase/migrations/20260425_get_availability_function.sql
+- Function public.get_availability(p_establishment_id uuid, p_date date)
+  retorna table(slot_start, slot_end, available) numa unica round-trip,
+  substituindo as 3 queries TS antigas em app/lib/availability.ts.
+- Respeita business_hours do dia da semana, derruba slots com reserva
+  (status 'confirmed' ou 'pending') e slot_blocks da mesma data.
+- SECURITY DEFINER + GRANT EXECUTE para anon, authenticated, service_role.
+- + 2 indices auxiliares (parciais) em reservations e slot_blocks.
+
+app/lib/availability.ts reescrito pra chamar admin.rpc(get_availability)
+via createAdminClient.
+
+Validacao em producao:
+- get_availability(<establishment>, '2026-04-25') retorna 12 slots,
+  com 5 marcados available=false, batendo 1:1 com as 5 reservas
+  confirmadas existentes (13:00, 14:00, 15:00, 18:00 e 21:00).
+
+Decisao de design: comportamento timezone-naive (UTC), identico ao TS
+atual, pra nao deslocar slot_starts ja gravados em producao. Switch
+pra timezone-aware (usar establishments.timezone) fica como follow-up
++ data migration separado.
+```
+
+---
+
+### Issue: **Cache HTTP de 60s na API de slots**
+Status → **Done**
+```
+Entregue no commit a4ffc75.
+
+middleware.ts agora seta o header em /api/reservar/slots:
+  Cache-Control: public, max-age=60, s-maxage=60, stale-while-revalidate=30
+
+Por que no middleware e nao no route handler: Next 16 descarta
+Cache-Control retornado por GET handlers dynamic-by-default (que usam
+request.url ou request.headers). O middleware atua sobre a response final
+e o header sobrevive. Verificado: probe direto no container e via Traefik
+mostra o header presente.
+
+Risco aceitavel: durante a janela de 60s o front pode mostrar um slot
+ja vendido — a action createReservationAction valida via constraint
+unico em reservations e devolve erro amigavel se houver conflito.
+```
+
+---
+
+### Issue: **Pipeline CI/CD (git push -> deploy automatico)**
+Status → **In Progress (parcial)**
+```
+Entrega parcial no commit 67ca04d.
+
+Foi entregue:
+- .github/workflows/ci.yml dispara em push e PR de master
+- Job: npm ci -> npx tsc --noEmit -> next build
+- Build usa placeholders nas envs do Supabase/Groq/Turnstile
+  (so valida que compila, sem deploy)
+
+Falta (sprint futuro):
+- Job de deploy via SSH no Swarm — exige SSH key + secrets configurados
+  no GitHub. Nao foi adicionado pra evitar pendencia de credencial.
+
+Observacao: o primeiro run do workflow (push do 67ca04d) ficou marcado
+como "failure" porque a conta do GitHub esta bloqueada por billing.
+Quando regularizar, o CI roda automaticamente e os proximos pushes
+ficam validados.
+```
