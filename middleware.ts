@@ -6,14 +6,20 @@ const BETO_COOKIE = 'beto_session'
 const BETO_MAX_AGE = 60 * 60 * 24 * 30 // 30 dias
 
 /**
- * Middleware centraliza 3 responsabilidades:
+ * Middleware centraliza 4 responsabilidades:
  *   1. /reservar + /api/beto/* — garante o cookie beto_session (sem forcar
  *      a pagina a ser dinamica).
  *   2. /admin/* — exige sessao Supabase Auth valida, redirect para
  *      /admin/login quando nao houver.
  *   3. /minhas-reservas/* — exige sessao do cliente final (Sprint 8),
  *      redirect para /entrar quando nao houver.
+ *   4. /api/reservar/slots — Sprint 4 (D.2): seta Cache-Control de 60s.
+ *      Necessario aqui pq Next 16 descarta Cache-Control setado dentro do
+ *      route handler em rotas dynamic-by-default.
  */
+
+const SLOTS_CACHE_CONTROL =
+  'public, max-age=60, s-maxage=60, stale-while-revalidate=30'
 
 function ensureBetoCookie(request: NextRequest, response: NextResponse): NextResponse {
   if (request.cookies.has(BETO_COOKIE)) return response
@@ -59,6 +65,13 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/beto/')
   ) {
     return ensureBetoCookie(request, NextResponse.next({ request }))
+  }
+
+  // Sprint 4 (D.2): cache HTTP de 60s na API publica de slots.
+  if (pathname === '/api/reservar/slots') {
+    const response = NextResponse.next({ request })
+    response.headers.set('Cache-Control', SLOTS_CACHE_CONTROL)
+    return response
   }
 
   // Rotas publicas do admin (login + reset de senha — Sprint 5.C)
@@ -108,6 +121,7 @@ export const config = {
     '/reservar',
     '/reservar/:path*',
     '/api/beto/:path*',
+    '/api/reservar/slots',
     '/admin/:path*',
     '/minhas-reservas',
     '/minhas-reservas/:path*',

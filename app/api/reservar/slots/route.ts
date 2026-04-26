@@ -50,6 +50,9 @@ export async function GET(request: Request) {
     return hour >= 17 && hour < 24
   })
 
+  // Cache-Control de 60s e setado no middleware.ts (Sprint 4 D.2). Em Next 16,
+  // GET route handlers dinamicos descartam Cache-Control setado aqui — o
+  // middleware atua sobre o response final e preserva o header.
   return NextResponse.json({
     ok: true,
     date,
