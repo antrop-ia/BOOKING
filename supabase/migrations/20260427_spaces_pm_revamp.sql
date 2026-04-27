@@ -10,7 +10,17 @@
 DO $$
 DECLARE
   v_establishment_id uuid := '86198aba-e929-4d71-9ef5-88383f7ea730';
+  v_tenant_id uuid;
 BEGIN
+  -- Resolve o tenant_id a partir do establishment (a tabela exige NOT NULL).
+  SELECT tenant_id INTO v_tenant_id
+    FROM public.establishments
+   WHERE id = v_establishment_id;
+
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'establishment % nao encontrado', v_establishment_id;
+  END IF;
+
   -- 1. Inativa os antigos (so se ainda estiverem ativos)
   UPDATE public.establishment_spaces
      SET is_active = false
@@ -18,14 +28,12 @@ BEGIN
      AND name IN ('Salão interno', 'Varanda externa', 'Salao interno', 'Varanda Externa');
 
   -- 2. Insere os 3 novos pedidos pelo PM. Slug e estavel (idempotente via UNIQUE).
-  --    capacity_pessoas e usado pelo F.3 (capacidade por pessoas) — ja deixo
-  --    semeado pra evitar uma 2a migration.
   INSERT INTO public.establishment_spaces
-    (establishment_id, name, slug, icon, description, sort_order, is_active)
+    (tenant_id, establishment_id, name, slug, icon, description, sort_order, is_active)
   VALUES
-    (v_establishment_id, 'Salão central',         'salao-central', '🏛️', 'Coracao do restaurante, mesas tradicionais.', 0, true),
-    (v_establishment_id, 'Área externa',          'area-externa',  '☀️', 'Mesas ao ar livre, ideal pra dias amenos.',   1, true),
-    (v_establishment_id, 'Área verde (coberta)',  'area-verde',    '🌿', 'Coberta, com plantas, sensacao de frescor.',  2, true)
+    (v_tenant_id, v_establishment_id, 'Salão central',         'salao-central', '🏛️', 'Coracao do restaurante, mesas tradicionais.', 0, true),
+    (v_tenant_id, v_establishment_id, 'Área externa',          'area-externa',  '☀️', 'Mesas ao ar livre, ideal pra dias amenos.',   1, true),
+    (v_tenant_id, v_establishment_id, 'Área verde (coberta)',  'area-verde',    '🌿', 'Coberta, com plantas, sensacao de frescor.',  2, true)
   ON CONFLICT (establishment_id, slug) DO UPDATE
     SET name = EXCLUDED.name,
         icon = EXCLUDED.icon,
