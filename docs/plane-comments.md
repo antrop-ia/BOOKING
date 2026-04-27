@@ -732,3 +732,132 @@ Smoke test em producao:
 Acesso por enquanto nivelado com o resto do shell (qualquer membership
 ve). Restringir a owner/manager fica como follow-up.
 ```
+
+---
+
+## Pacote F.1+F.2 — Mudancas do PM no fluxo publico (27/04/2026)
+
+> SHA do commit: **3adf540**
+> Migration aplicada manualmente no Supabase: **20260427_spaces_pm_revamp.sql**
+
+### Issue: **PM revamp F.1.b — Pessoas mais de 6 abrem campo livre**
+Status → **Done**
+```
+Entregue no commit 3adf540.
+
+BookingScreen agora exibe pills 1-6 + um pill "Mais de 6". Ao clicar,
+abre um input numerico inline (limite 7..30 com clamp on blur). O
+partySize state continua string, mas armazena o valor exato digitado
+(ex "12") em vez do label "6+" antigo — que era um bug latente porque
+Number("6+") = NaN no createReservationAction.
+
+Validacao no server defensiva tambem: 1..30 inteiros. Quem tentar
+forjar 999 recebe "Numero de pessoas invalido (1 a 30)".
+```
+
+---
+
+### Issue: **PM revamp F.1.c — 3 espacos novos pedidos pelo PM**
+Status → **Done**
+```
+Entregue no commit 3adf540 + migration aplicada manualmente.
+
+Migration: supabase/migrations/20260427_spaces_pm_revamp.sql
+- Inativa "Salao interno" e "Varanda externa" (is_active=false). Reservas
+  existentes ligadas a esses dois espacos continuam mostrando o nome
+  certo na ficha — nao ha cascade nem perda de dado.
+- Insere 3 novos com slug estavel:
+  · 🏛️ Salao central
+  · ☀️ Area externa
+  · 🌿 Area verde (coberta)
+- Idempotente (UPDATE filtrado + ON CONFLICT...DO UPDATE).
+
+Capacidade em pessoas (ex Area externa = 30) sera adicionada no F.3
+(coluna capacity_pessoas). Por hora os espacos nao tem cap por pessoa.
+```
+
+---
+
+### Issue: **PM revamp F.1.d — Codigo destacado + botao copiar + share**
+Status → **Done**
+```
+Entregue no commit 3adf540.
+
+ConfirmacaoScreen reformulada:
+- Codigo da reserva agora vive num card destacado (fundo amber, borda
+  amber, fonte 26px monospaced) com botao "📋 Copiar codigo" que da
+  feedback visual ao copiar.
+- Linha "Codigo" removida da tabela de detalhes (ja esta em destaque
+  acima — evita redundancia).
+- Botao primario grande mudou de "NOVA RESERVA" pra "CONSULTAR RESERVA"
+  (apontando pra /reservar/consultar?codigo=XXXX). E o que o cliente vai
+  querer fazer depois — checar a reserva mais tarde.
+- Botao secundario "📤 Compartilhar" substitui o "SALVAR RECIBO"
+  (window.print). Usa navigator.share quando disponivel (celular), com
+  fallback pra clipboard com toast confirmando.
+- "Fazer nova reserva" virou link discreto no rodape (acao secundaria).
+```
+
+---
+
+### Issue: **PM revamp F.1+F.2 — Consulta publica de reserva por codigo**
+Status → **Done**
+```
+Entregue no commit 3adf540.
+
+Duas rotas novas (server components, force-dynamic):
+- /reservar/consultar (page.tsx + ConsultarForm.tsx): tela escura
+  no estilo do fluxo publico. Input com mascara visual P8187-XXXX,
+  validacao do formato, redirect pra ficha. Se a URL tem ?codigo=...
+  (vindo do link da ConfirmacaoScreen), pula a tela e ja redireciona.
+- /reservar/consultar/[codigo] (page.tsx + ConsultaPublicaView.tsx):
+  ficha publica read-only com codigo destacado, copiar, info da reserva
+  (data/horario/turno/pessoas/espaco/ocasiao/observacao), botao
+  "Adicionar ao calendario" (.ics), botao "Falar com o restaurante"
+  (se whatsapp configurado em RESTAURANT_INFO). Sem cancelamento
+  (clientes logados continuam usando /minhas-reservas/[codigo]).
+
+CTA na home: link "Ja tenho reserva — consultar" no rodape da
+BookingScreen. Discreto mas visivel.
+
+Errors de lookup mostram mensagem amigavel na tela de input:
+- invalido: "Formato invalido. Esperamos algo como #P8187-A1B2"
+- nao_encontrada: "Codigo nao encontrado. Confira os caracteres."
+- ambiguo: "Esse codigo curto colide com outra reserva — entre em contato"
+
+Bug colateral resolvido: ILIKE em coluna uuid quebra no Postgres
+(42883). Usa range gte/lt com boundaries calculados em JS a partir
+dos 4 hex chars do codigo. /minhas-reservas/[codigo] tem o mesmo
+bug latente — tech debt pra fechar depois.
+```
+
+---
+
+### Issue: **PM revamp F.3 — Capacidade multipla por horario (em pessoas)**
+Status → **In Progress**
+```
+NAO entregue ainda. Plano detalhado em /root/.claude/plans/twinkly-enchanting-tide.md
+
+Decisoes ja trancadas pelo PM:
+- Modelo: capacidade em PESSOAS por espaco, nao em "numero de reservas"
+- Capacidades default: Salao central 60 / Area externa 30 / Area verde 40
+- Configuravel depois pelo admin
+
+Mudancas:
+1. Migration: ALTER TABLE establishment_spaces ADD COLUMN
+   capacity_pessoas integer DEFAULT 30; UPDATE pra os 3 novos com
+   60/30/40; DROP UNIQUE (establishment_id, slot_start) em reservations.
+2. get_availability v2: assinatura nova (uuid, date, uuid space_id,
+   integer party_size) retorna table com remaining_pessoas; available
+   = (taken + party_size <= capacity).
+3. createReservation: PL/pgSQL try_create_reservation com
+   pg_advisory_xact_lock por hash de (space, slot) pra evitar race
+   condition que estoure capacidade em concorrencia.
+4. App: availability.ts/slots/route.ts/HorariosScreen passam space_id
+   + party_size. Order do flow ja e date->people->space->time, so
+   precisa propagar os params.
+5. Admin UI: campo "Capacidade (pessoas)" em /admin/configuracoes/espacos.
+
+Estimativa: ~7h. Risco alto por mexer no constraint UNIQUE e na
+criacao concorrente. Migration de drop nao tem rollback trivial.
+```
