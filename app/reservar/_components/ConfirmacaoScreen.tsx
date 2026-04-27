@@ -31,7 +31,10 @@ export default function ConfirmacaoScreen({
   onNovaReserva,
 }: ConfirmacaoScreenProps) {
   const [primaryHover, setPrimaryHover] = useState(false)
-  const [secondaryHover, setSecondaryHover] = useState(false)
+  const [shareHover, setShareHover] = useState(false)
+  const [novaHover, setNovaHover] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
+  const [shareToast, setShareToast] = useState<string | null>(null)
 
   const saudacao: Record<string, string> = {
     Aniversário: `Feliz aniversário, ${nome}! Te esperamos.`,
@@ -40,6 +43,8 @@ export default function ConfirmacaoScreen({
     'Happy hour': `Bora, ${nome}! Te esperamos na brasa.`,
   }
   const subtitulo = ocasiao ? saudacao[ocasiao] : `Te esperamos, ${nome}. Bora!`
+
+  const codigoLimpo = codigo.replace(/^#/, '')
 
   const rows = [
     {
@@ -80,17 +85,56 @@ export default function ConfirmacaoScreen({
           },
         ]
       : []),
-    {
-      label: 'Código',
-      value: codigo,
-      valueStyle: {
-        color: '#F0E8D8',
-        fontSize: '13px',
-        fontWeight: 700,
-        fontFamily: "'DM Mono', monospace",
-      } as React.CSSProperties,
-    },
   ]
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(codigo)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 1800)
+    } catch {
+      setShareToast('Nao consegui copiar — selecione e copie manualmente.')
+      setTimeout(() => setShareToast(null), 2400)
+    }
+  }
+
+  const buildShareText = (): string => {
+    const lines = [
+      '🥩 Reserva confirmada na Parrilla 8187',
+      '',
+      `Em nome de: ${nome}`,
+      `Data: ${dateLabel}`,
+      `Horário: ${horario}`,
+      `Pessoas: ${partySize}`,
+      ...(espaco ? [`Espaço: ${espaco}`] : []),
+      `Código: ${codigo}`,
+    ]
+    return lines.join('\n')
+  }
+
+  const handleShare = async () => {
+    const text = buildShareText()
+    const shareData = {
+      title: 'Reserva — Parrilla 8187',
+      text,
+    }
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch {
+        // User cancelou ou erro — cai pro fallback (copia).
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      setShareToast('Detalhes copiados — cole onde quiser!')
+      setTimeout(() => setShareToast(null), 2400)
+    } catch {
+      setShareToast('Nao consegui compartilhar.')
+      setTimeout(() => setShareToast(null), 2400)
+    }
+  }
 
   return (
     <div className="min-h-screen max-w-[375px] mx-auto" style={{ backgroundColor: '#0A0906' }}>
@@ -186,7 +230,7 @@ export default function ConfirmacaoScreen({
             textAlign: 'center',
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            marginBottom: '28px',
+            marginBottom: '24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -199,6 +243,79 @@ export default function ConfirmacaoScreen({
           Reserva registrada com sucesso
         </div>
 
+        {/* CODIGO EM DESTAQUE */}
+        <div
+          style={{
+            backgroundColor: 'rgba(245,192,66,0.06)',
+            border: '1px solid rgba(245,192,66,0.35)',
+            borderRadius: '4px',
+            padding: '16px 14px',
+            marginBottom: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              color: '#F5C042',
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              marginBottom: '8px',
+            }}
+          >
+            Código da reserva
+          </div>
+          <div
+            style={{
+              color: '#F0E8D8',
+              fontSize: '26px',
+              fontWeight: 700,
+              fontFamily: "'DM Mono', monospace",
+              letterSpacing: '0.04em',
+              marginBottom: '12px',
+              wordBreak: 'break-all',
+            }}
+          >
+            {codigo}
+          </div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              backgroundColor: copyState === 'copied' ? 'rgba(76,175,125,0.18)' : 'rgba(245,192,66,0.12)',
+              border: `1px solid ${copyState === 'copied' ? 'rgba(76,175,125,0.5)' : 'rgba(245,192,66,0.4)'}`,
+              borderRadius: '4px',
+              color: copyState === 'copied' ? '#A6E3BE' : '#F5C042',
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              fontFamily: "'DM Sans', sans-serif",
+              transition: 'all 150ms',
+            }}
+          >
+            {copyState === 'copied' ? '✓ Copiado' : '📋 Copiar código'}
+          </button>
+          <div
+            style={{
+              color: '#7A6A50',
+              fontSize: '11px',
+              marginTop: '12px',
+              fontFamily: "'DM Sans', sans-serif",
+              lineHeight: 1.4,
+            }}
+          >
+            Apresente esse código no restaurante.
+          </div>
+        </div>
+
+        {/* DETALHES */}
         <div
           style={{
             backgroundColor: '#161410',
@@ -243,7 +360,7 @@ export default function ConfirmacaoScreen({
           <a
             href={`/entrar?${new URLSearchParams({
               ...(email ? { email } : {}),
-              resgatar: codigo.replace(/^#/, ''),
+              resgatar: codigoLimpo,
             }).toString()}`}
             style={{
               display: 'block',
@@ -281,21 +398,25 @@ export default function ConfirmacaoScreen({
           </a>
         )}
 
-        <button
-          onClick={onNovaReserva}
+        {/* BOTOES */}
+        <a
+          href={`/reservar/consultar?codigo=${encodeURIComponent(codigoLimpo)}`}
           onMouseOver={() => setPrimaryHover(true)}
           onMouseOut={() => setPrimaryHover(false)}
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             width: '100%',
             height: '52px',
             backgroundColor: '#F5C042',
-            border: 'none',
             borderRadius: '4px',
             color: '#0A0906',
             fontSize: '13px',
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
+            textDecoration: 'none',
             cursor: 'pointer',
             fontFamily: "'DM Sans', sans-serif",
             marginBottom: '10px',
@@ -303,31 +424,75 @@ export default function ConfirmacaoScreen({
             opacity: primaryHover ? 0.88 : 1,
           }}
         >
-          NOVA RESERVA
-        </button>
+          CONSULTAR RESERVA
+        </a>
 
         <button
-          onClick={() => window.print()}
-          onMouseOver={() => setSecondaryHover(true)}
-          onMouseOut={() => setSecondaryHover(false)}
+          onClick={handleShare}
+          onMouseOver={() => setShareHover(true)}
+          onMouseOut={() => setShareHover(false)}
           style={{
             width: '100%',
             height: '44px',
             backgroundColor: 'transparent',
-            border: secondaryHover ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.09)',
+            border: shareHover
+              ? '1px solid rgba(245,192,66,0.5)'
+              : '1px solid rgba(245,192,66,0.25)',
             borderRadius: '4px',
-            color: secondaryHover ? '#F0E8D8' : '#7A6A50',
+            color: shareHover ? '#F5C042' : '#C9A338',
             fontSize: '12px',
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             cursor: 'pointer',
             fontFamily: "'DM Sans', sans-serif",
+            marginBottom: '10px',
             transition: 'all 150ms',
           }}
         >
-          SALVAR RECIBO
+          📤 COMPARTILHAR
         </button>
+
+        <button
+          onClick={onNovaReserva}
+          onMouseOver={() => setNovaHover(true)}
+          onMouseOut={() => setNovaHover(false)}
+          style={{
+            width: '100%',
+            height: '40px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: novaHover ? '#F0E8D8' : '#7A6A50',
+            fontSize: '12px',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+            transition: 'color 150ms',
+          }}
+        >
+          Fazer nova reserva
+        </button>
+
+        {shareToast && (
+          <div
+            role="status"
+            style={{
+              marginTop: '14px',
+              padding: '10px 12px',
+              backgroundColor: 'rgba(76,175,125,0.12)',
+              border: '1px solid rgba(76,175,125,0.35)',
+              borderRadius: '4px',
+              color: '#A6E3BE',
+              fontSize: '12px',
+              textAlign: 'center',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {shareToast}
+          </div>
+        )}
       </div>
     </div>
   )

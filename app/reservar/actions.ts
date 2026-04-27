@@ -70,8 +70,8 @@ export async function createReservationAction(
     }
 
     const partySize = Number(input.partySize)
-    if (!Number.isFinite(partySize) || partySize < 1) {
-      return { ok: false, error: 'Número de pessoas inválido' }
+    if (!Number.isFinite(partySize) || partySize < 1 || partySize > 30) {
+      return { ok: false, error: 'Numero de pessoas invalido (1 a 30).' }
     }
 
     if (!input.spaceId || input.spaceId.trim().length === 0) {

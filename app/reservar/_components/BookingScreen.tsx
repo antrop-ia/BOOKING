@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { PillSelector } from './PillSelector'
 import { DateCard } from './DateCard'
 import { PrimaryButton } from './PrimaryButton'
@@ -23,7 +24,13 @@ interface BookingScreenProps {
   onContinue: () => void
 }
 
-const partySizes = ['1', '2', '3', '4', '5', '6+']
+const FIXED_PARTY_SIZES = ['1', '2', '3', '4', '5', '6']
+const MAX_PARTY = 30
+
+function isCustomPartySize(value: string): boolean {
+  if (value === '') return false
+  return !FIXED_PARTY_SIZES.includes(value)
+}
 
 export function BookingScreen({
   partySize,
@@ -35,6 +42,54 @@ export function BookingScreen({
   dates,
   onContinue,
 }: BookingScreenProps) {
+  const customMode = isCustomPartySize(partySize)
+  const [draftCustom, setDraftCustom] = useState<string>(customMode ? partySize : '')
+  const customInputRef = useRef<HTMLInputElement>(null)
+
+  // Mantem o draft sincronizado quando o partySize muda externamente
+  // (ex: reset de fluxo).
+  useEffect(() => {
+    if (customMode) setDraftCustom(partySize)
+    else setDraftCustom('')
+  }, [partySize, customMode])
+
+  const handleSelectFixed = (size: string) => {
+    setPartySize(size)
+    setDraftCustom('')
+  }
+
+  const handleOpenCustom = () => {
+    // Se ja esta em custom, mantem; senao inicia em 7.
+    if (!customMode) {
+      setPartySize('7')
+      setDraftCustom('7')
+    }
+    // Foca no input depois do render.
+    setTimeout(() => customInputRef.current?.focus(), 30)
+  }
+
+  const handleCustomChange = (raw: string) => {
+    // Aceita digitacao livre (incluindo vazio enquanto edita).
+    const onlyDigits = raw.replace(/\D/g, '').slice(0, 2)
+    setDraftCustom(onlyDigits)
+    if (onlyDigits === '') return
+    const n = Number(onlyDigits)
+    if (Number.isFinite(n) && n >= 7 && n <= MAX_PARTY) {
+      setPartySize(String(n))
+    }
+  }
+
+  const handleCustomBlur = () => {
+    const n = Number(draftCustom)
+    if (!Number.isFinite(n) || n < 7) {
+      setPartySize('7')
+      setDraftCustom('7')
+    } else if (n > MAX_PARTY) {
+      setPartySize(String(MAX_PARTY))
+      setDraftCustom(String(MAX_PARTY))
+    }
+  }
+
   return (
     <div className="min-h-screen max-w-[375px] mx-auto" style={{ backgroundColor: '#0A0906' }}>
       <StatusBar />
@@ -84,16 +139,53 @@ export function BookingScreen({
         <div className="text-[10px] font-bold uppercase tracking-[0.1em] mb-[10px]" style={{ color: '#5C5549' }}>
           Quantas pessoas?
         </div>
-        <div className="flex flex-wrap gap-[7px] mb-[22px]">
-          {partySizes.map((size) => (
+        <div className="flex flex-wrap gap-[7px] mb-[14px]">
+          {FIXED_PARTY_SIZES.map((size) => (
             <PillSelector
               key={size}
               label={size}
-              selected={partySize === size}
-              onClick={() => setPartySize(size)}
+              selected={!customMode && partySize === size}
+              onClick={() => handleSelectFixed(size)}
             />
           ))}
+          <PillSelector
+            label={customMode ? `${partySize}` : 'Mais de 6'}
+            selected={customMode}
+            onClick={handleOpenCustom}
+          />
         </div>
+        {customMode && (
+          <div
+            className="mb-[22px] flex items-center gap-[10px] rounded-[4px] px-[12px] py-[10px]"
+            style={{ backgroundColor: '#161410', border: '1px solid rgba(245,192,66,0.25)' }}
+          >
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.1em]"
+              style={{ color: '#5C5549' }}
+            >
+              Quantas pessoas?
+            </span>
+            <input
+              ref={customInputRef}
+              type="number"
+              inputMode="numeric"
+              min={7}
+              max={MAX_PARTY}
+              value={draftCustom}
+              onChange={(e) => handleCustomChange(e.target.value)}
+              onBlur={handleCustomBlur}
+              className="flex-1 rounded-[4px] bg-transparent px-[8px] py-[6px] text-right outline-none"
+              style={{
+                color: '#F0E8D8',
+                fontFamily: "'DM Mono', monospace",
+                fontSize: '15px',
+                fontWeight: 700,
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            />
+            <span style={{ color: '#9B9385', fontSize: '11px' }}>pessoas</span>
+          </div>
+        )}
       </div>
 
       <div className="px-[22px]">
@@ -139,8 +231,21 @@ export function BookingScreen({
         </div>
       </div>
 
-      <div className="px-[22px] pb-10">
+      <div className="px-[22px] pb-4">
         <PrimaryButton onClick={onContinue}>Ver horários disponíveis</PrimaryButton>
+      </div>
+
+      <div className="px-[22px] pb-10 text-center">
+        <a
+          href="/reservar/consultar"
+          className="text-[12px] underline"
+          style={{
+            color: '#7A6A50',
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Já tenho reserva — consultar
+        </a>
       </div>
     </div>
   )
