@@ -151,6 +151,12 @@ export async function createReservation(
   })
 
   if (error) {
+    console.error('[createReservation] try_create_reservation rpc error', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
     return {
       ok: false,
       error: 'Não foi possível registrar a reserva. Tente novamente.',
