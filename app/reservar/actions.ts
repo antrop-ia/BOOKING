@@ -5,7 +5,7 @@ import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { clientIpFromHeaders, rateLimit } from '@/app/lib/rate-limit'
 import { createReservation } from '@/app/lib/reservations'
 import { createAdminClient, createClient } from '@/app/lib/supabase/server'
-import { logAuditEvent } from '@/app/lib/audit'
+import { checkReservationBurst, logAuditEvent } from '@/app/lib/audit'
 import { verifyTurnstileToken } from '@/app/lib/turnstile'
 import { notifyGuestConfirmation, notifyNewReservation } from '@/app/lib/notifications'
 
@@ -125,6 +125,14 @@ export async function createReservationAction(
       establishmentId: ctx.establishmentId,
       ip,
       details: { reservationId: result.reservationId, partySize },
+    })
+
+    // Sprint 6.A.3: deteccao de burst (>5 reservas/IP/10min).
+    // Roda em paralelo com as notificacoes — best-effort, nao bloqueia.
+    void checkReservationBurst({
+      ip,
+      tenantId: ctx.tenantId,
+      establishmentId: ctx.establishmentId,
     })
 
     // Sprint 9: notificações WhatsApp. Best-effort, nunca derruba o fluxo.
