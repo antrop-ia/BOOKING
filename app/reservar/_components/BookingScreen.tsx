@@ -149,43 +149,50 @@ export function BookingScreen({
             />
           ))}
           <PillSelector
-            label={customMode ? `${partySize}` : 'Mais de 6'}
+            label={customMode ? `${partySize}` : '+'}
             selected={customMode}
             onClick={handleOpenCustom}
           />
         </div>
-        {customMode && (
-          <div
-            className="mb-[22px] flex items-center gap-[10px] rounded-[4px] px-[12px] py-[10px]"
-            style={{ backgroundColor: '#161410', border: '1px solid rgba(245,192,66,0.25)' }}
+        <div
+          className="mb-[22px] flex items-center gap-[10px] rounded-[4px] px-[12px] py-[10px]"
+          style={{
+            backgroundColor: '#161410',
+            border: customMode
+              ? '1px solid rgba(245,192,66,0.35)'
+              : '1px solid rgba(255,255,255,0.06)',
+            opacity: customMode ? 1 : 0.55,
+            transition: 'opacity 150ms, border-color 150ms',
+          }}
+        >
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.1em]"
+            style={{ color: '#5C5549' }}
           >
-            <span
-              className="text-[10px] font-bold uppercase tracking-[0.1em]"
-              style={{ color: '#5C5549' }}
-            >
-              Quantas pessoas?
-            </span>
-            <input
-              ref={customInputRef}
-              type="number"
-              inputMode="numeric"
-              min={7}
-              max={MAX_PARTY}
-              value={draftCustom}
-              onChange={(e) => handleCustomChange(e.target.value)}
-              onBlur={handleCustomBlur}
-              className="flex-1 rounded-[4px] bg-transparent px-[8px] py-[6px] text-right outline-none"
-              style={{
-                color: '#F0E8D8',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '15px',
-                fontWeight: 700,
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-            />
-            <span style={{ color: '#9B9385', fontSize: '11px' }}>pessoas</span>
-          </div>
-        )}
+            Mais de 6 pessoas
+          </span>
+          <input
+            ref={customInputRef}
+            type="number"
+            inputMode="numeric"
+            min={7}
+            max={MAX_PARTY}
+            disabled={!customMode}
+            placeholder={customMode ? '' : 'desativado'}
+            value={customMode ? draftCustom : ''}
+            onChange={(e) => handleCustomChange(e.target.value)}
+            onBlur={handleCustomBlur}
+            className="flex-1 rounded-[4px] bg-transparent px-[8px] py-[6px] text-right outline-none disabled:cursor-not-allowed"
+            style={{
+              color: customMode ? '#F0E8D8' : '#5C5549',
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '15px',
+              fontWeight: 700,
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          />
+          <span style={{ color: '#9B9385', fontSize: '11px' }}>pessoas</span>
+        </div>
       </div>
 
       <div className="px-[22px]">
