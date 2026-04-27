@@ -62,3 +62,16 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
+
+/* Mobile zoom-on-focus fix (PM revamp 27/04/2026)
+   iOS Safari amplia automaticamente quando o input tem font-size < 16px.
+   Forca minimo 16px em telas pequenas pra eliminar o efeito de zoom que
+   "samba" o layout quando o user toca em campo de email/whatsapp/Beto.
+   Inputs com font-size >= 16px ficam preservados via max(). */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+}
