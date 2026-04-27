@@ -681,3 +681,54 @@ como "failure" porque a conta do GitHub esta bloqueada por billing.
 Quando regularizar, o CI roda automaticamente e os proximos pushes
 ficam validados.
 ```
+
+---
+
+## Sprint 6.A.3 — Deteccao burst + UI auditoria (27/04/2026)
+
+> SHA do commit: **2c17818**
+
+### Issue: **Detecao proativa de abuso (burst > 5 reservas/IP/10min)**
+Status → **Done**
+```
+Entregue no commit 2c17818.
+
+Logica: app/lib/audit.ts ganhou checkReservationBurst(ip, tenantId, ...)
+que, apos cada reserva criada com sucesso, conta reservation_created do
+mesmo IP nos ultimos 10min. Se passa do threshold (5), registra um
+evento burst_detected no audit_log. Anti-spam: so loga 1 vez por IP
+por janela.
+
+Disparada em app/reservar/actions.ts apos o insert via void (best-effort,
+nao bloqueia, nao envia alerta). O sinal fica no audit_log e aparece
+em /admin/audit (badge rose destacado).
+
+AuditEventType extendido com 'burst_detected'.
+
+Limitacao conhecida: nao envia alerta proativo (Telegram/Slack/email).
+Quem precisa investigar precisa abrir /admin/audit. Tornar push fica
+como follow-up se o uso crescer.
+```
+
+---
+
+### Issue: **UI /admin/audit para consulta de eventos**
+Status → **Done**
+```
+Entregue no commit 2c17818.
+
+Nova rota /admin/audit (server component, force-dynamic):
+- Lista as 200 linhas mais recentes do audit_log do tenant.
+- Filtros: janela (24h/7d/30d/tudo), tipo de evento, IP.
+- Tabela com 4 colunas: quando (BR-Recife), evento (badge colorido),
+  IP (mono), detalhes (resumo curto + json on-demand).
+- Badge: amber pros rate_limit, vermelho pros rejected, verde pros
+  reservation_created, rose-bold pro burst_detected.
+- Link "Auditoria" no nav do shell admin.
+
+Smoke test em producao:
+  /admin/audit (sem login) -> 307 (redireciona pra /admin/login)
+
+Acesso por enquanto nivelado com o resto do shell (qualquer membership
+ve). Restringir a owner/manager fica como follow-up.
+```
