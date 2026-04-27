@@ -834,30 +834,60 @@ bug latente — tech debt pra fechar depois.
 ---
 
 ### Issue: **PM revamp F.3 — Capacidade multipla por horario (em pessoas)**
-Status → **In Progress**
+Status → **Done**
 ```
-NAO entregue ainda. Plano detalhado em /root/.claude/plans/twinkly-enchanting-tide.md
+Entregue no commit a17ca9f + migration aplicada manualmente em
+supabase/migrations/20260427b_slot_capacity_and_party.sql.
 
-Decisoes ja trancadas pelo PM:
-- Modelo: capacidade em PESSOAS por espaco, nao em "numero de reservas"
-- Capacidades default: Salao central 60 / Area externa 30 / Area verde 40
-- Configuravel depois pelo admin
+Modelo novo: cada espaco tem capacity_pessoas. Multiplas reservas
+podem ocupar o mesmo slot+espaco ate o limite de pessoas. Antes era
+1 reserva por slot/estabelecimento.
 
-Mudancas:
-1. Migration: ALTER TABLE establishment_spaces ADD COLUMN
-   capacity_pessoas integer DEFAULT 30; UPDATE pra os 3 novos com
-   60/30/40; DROP UNIQUE (establishment_id, slot_start) em reservations.
-2. get_availability v2: assinatura nova (uuid, date, uuid space_id,
-   integer party_size) retorna table com remaining_pessoas; available
-   = (taken + party_size <= capacity).
-3. createReservation: PL/pgSQL try_create_reservation com
-   pg_advisory_xact_lock por hash de (space, slot) pra evitar race
-   condition que estoure capacidade em concorrencia.
-4. App: availability.ts/slots/route.ts/HorariosScreen passam space_id
-   + party_size. Order do flow ja e date->people->space->time, so
-   precisa propagar os params.
-5. Admin UI: campo "Capacidade (pessoas)" em /admin/configuracoes/espacos.
+Capacidades default (editaveis em /admin/configuracoes/espacos):
+- Salao central: 60
+- Area externa:  30
+- Area verde:    40
 
-Estimativa: ~7h. Risco alto por mexer no constraint UNIQUE e na
-criacao concorrente. Migration de drop nao tem rollback trivial.
+Schema:
+- establishment_spaces.capacity_pessoas (1..500, default 30)
+- reservations.party_size (NOT NULL DEFAULT 1, CHECK 1..50). Backfill
+  via regex de "pessoas: N" no guest_contact.
+- DROP UNIQUE (establishment_id, slot_start) em reservations.
+- get_availability_v2(uuid, date, uuid space_id, integer party_size)
+  retorna (slot_start, slot_end, available, remaining_pessoas).
+  available = (cap - SUM(party_size do slot+espaco)) >= party_size E
+  nao ha slot_block.
+- try_create_reservation(...) com pg_advisory_xact_lock por hash de
+  (space_id, slot_start). Serializa requests concorrentes pro mesmo
+  slot+espaco. Retorna error_code in (over_capacity, slot_blocked,
+  space_not_found).
+- Indice reservations_space_slot_active.
+
+App layer:
+- BookingFlow REORDENADO: agora booking → espaco → horarios → dados.
+  (Necessario pq capacidade depende de space_id antes de calcular slots.)
+- HorariosScreen: recebe spaceId + spaceName, manda ?space_id=X&party_size=N.
+- /api/reservar/slots/route.ts: valida space_id (uuid) + party_size (1..50).
+- app/lib/availability.ts: chama get_availability_v2.
+- app/lib/reservations.ts: createReservation usa try_create_reservation
+  RPC. Trata over_capacity com mensagem amigavel mostrando vagas restantes.
+
+Admin UI:
+- /admin/configuracoes/espacos: novo campo "Capacidade (pessoas)" no
+  form. Lista mostra "cap: N pessoas".
+- /admin/reservas (criacao manual): exige spaceId.
+
+Smoke validado em producao:
+- Area externa, 2026-05-01, jantar, party=5: 22:00 remaining=23
+  (correto, cap 30 menos reserva legada de 7) e available=true
+- Mesmo slot, party=25: available=false (23 < 25). Outros 5 slots do
+  jantar continuam available=true rem=30.
+
+Risco coberto:
+- Race condition: pg_advisory_xact_lock serializa concorrencia no
+  mesmo slot+espaco. Dois requests simultaneos com cap quase no
+  limite, apenas um passa.
+- Reservas legadas em espacos inativos (Salao interno, Varanda
+  externa) nao afetam capacidade dos novos espacos pq
+  get_availability_v2 filtra por p_space_id especifico.
 ```
