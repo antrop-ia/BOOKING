@@ -83,6 +83,12 @@ export async function createManualReservation(
   if (!Number.isFinite(input.partySize) || input.partySize < 1) {
     return { ok: false, error: 'Número de pessoas inválido' }
   }
+  // Sprint F.3: capacidade depende de space_id, entao admin tambem precisa
+  // escolher um espaco. Sem space_id, try_create_reservation rejeita com
+  // space_not_found.
+  if (!input.spaceId || input.spaceId.trim() === '') {
+    return { ok: false, error: 'Escolha um espaço.' }
+  }
 
   const result = await createReservation({
     tenantId: ctx.tenantId,

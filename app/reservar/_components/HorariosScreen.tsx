@@ -5,6 +5,8 @@ import { StatusBar } from './StatusBar'
 
 interface HorariosScreenProps {
   partySize: string
+  spaceId: string
+  spaceName: string
   dateISO: string
   dateLabel: string
   turno: 'almoco' | 'jantar'
@@ -16,10 +18,13 @@ interface Slot {
   start: string // ISO UTC
   end: string
   available: boolean
+  remaining_pessoas?: number
 }
 
 export default function HorariosScreen({
   partySize,
+  spaceId,
+  spaceName,
   dateISO,
   dateLabel,
   turno,
@@ -28,7 +33,9 @@ export default function HorariosScreen({
 }: HorariosScreenProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null)
-  const [slots, setSlots] = useState<{ label: string; iso: string; available: boolean }[]>([])
+  const [slots, setSlots] = useState<
+    { label: string; iso: string; available: boolean; remaining: number }[]
+  >([])
   const [loading, setLoading] = useState(true)
 
   const turnoLabel = turno === 'almoco' ? 'Almoço' : 'Jantar'
@@ -36,7 +43,12 @@ export default function HorariosScreen({
   useEffect(() => {
     setSelected(null)
     setLoading(true)
-    fetch(`/api/reservar/slots?date=${dateISO}&turno=${turno}`)
+    const url = new URL('/api/reservar/slots', window.location.origin)
+    url.searchParams.set('date', dateISO)
+    url.searchParams.set('turno', turno)
+    url.searchParams.set('space_id', spaceId)
+    url.searchParams.set('party_size', partySize)
+    fetch(url.toString())
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) {
@@ -47,13 +59,18 @@ export default function HorariosScreen({
           const d = new Date(s.start)
           const hh = String(d.getHours()).padStart(2, '0')
           const mm = String(d.getMinutes()).padStart(2, '0')
-          return { label: `${hh}:${mm}`, iso: s.start, available: s.available }
+          return {
+            label: `${hh}:${mm}`,
+            iso: s.start,
+            available: s.available,
+            remaining: typeof s.remaining_pessoas === 'number' ? s.remaining_pessoas : 0,
+          }
         })
         setSlots(shaped)
       })
       .catch(() => setSlots([]))
       .finally(() => setLoading(false))
-  }, [dateISO, turno])
+  }, [dateISO, turno, spaceId, partySize])
 
   return (
     <div
@@ -96,6 +113,7 @@ export default function HorariosScreen({
           }}
         >
           {dateLabel} · {partySize} pessoas · {turnoLabel}
+          {spaceName ? ` · ${spaceName}` : ''}
         </div>
         <div
           style={{

@@ -1,14 +1,14 @@
 /**
  * app/lib/availability.ts
  *
- * Cálculo de slots disponíveis por estabelecimento e dia.
+ * Cálculo de slots disponíveis por estabelecimento, dia, espaço e pessoas.
  *
- * Sprint 4 (D.1): delega o trabalho pra function PL/pgSQL
- * `public.get_availability(establishment_id, date)` — 1 round-trip ao banco
- * em vez das 3 queries TS anteriores. Comportamento equivalente:
- * respeita business_hours, reservas (confirmed/pending) e slot_blocks.
+ * Sprint F.3: agora usa `get_availability_v2` (PL/pgSQL) que recebe
+ * space_id + party_size e retorna `available` baseado em capacidade do
+ * espaço em pessoas, não em "1 reserva por slot".
  *
- * Definição da function: supabase/migrations/20260425_get_availability_function.sql
+ * Definição da função:
+ *   supabase/migrations/20260427b_slot_capacity_and_party.sql
  */
 
 import { createAdminClient } from '@/app/lib/supabase/server'
@@ -17,25 +17,31 @@ export type AvailableSlot = {
   start: string
   end: string
   available: boolean
+  remaining_pessoas: number
 }
 
 type RpcRow = {
   slot_start: string
   slot_end: string
   available: boolean
+  remaining_pessoas: number
 }
 
 export async function getAvailability(
   establishmentId: string,
-  dayISO: string
+  dayISO: string,
+  spaceId: string,
+  partySize: number
 ): Promise<AvailableSlot[]> {
   // RLS pública não expõe reservations/slot_blocks; admin client server-side
-  // executa a function SECURITY DEFINER e retorna apenas {start, end, available}.
+  // executa a function SECURITY DEFINER e retorna apenas o agregado.
   const admin = createAdminClient()
 
-  const { data, error } = await admin.rpc('get_availability', {
+  const { data, error } = await admin.rpc('get_availability_v2', {
     p_establishment_id: establishmentId,
     p_date: dayISO,
+    p_space_id: spaceId,
+    p_party_size: partySize,
   })
 
   if (error) {
@@ -48,5 +54,6 @@ export async function getAvailability(
     start: new Date(r.slot_start).toISOString(),
     end: new Date(r.slot_end).toISOString(),
     available: r.available,
+    remaining_pessoas: r.remaining_pessoas,
   }))
 }

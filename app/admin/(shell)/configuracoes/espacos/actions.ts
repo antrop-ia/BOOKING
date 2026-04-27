@@ -15,6 +15,8 @@ export interface UpsertSpaceInput {
   icon: string
   sortOrder: number
   isActive: boolean
+  /** Sprint F.3: capacidade total em pessoas no espaco. */
+  capacityPessoas: number
 }
 
 async function ensureEditorContext(): Promise<
@@ -52,6 +54,13 @@ function validate(input: UpsertSpaceInput): string | null {
   if (!Number.isInteger(input.sortOrder) || input.sortOrder < 0 || input.sortOrder > 999) {
     return 'Ordem invalida'
   }
+  if (
+    !Number.isInteger(input.capacityPessoas) ||
+    input.capacityPessoas < 1 ||
+    input.capacityPessoas > 500
+  ) {
+    return 'Capacidade invalida (1 a 500 pessoas)'
+  }
   return null
 }
 
@@ -76,6 +85,7 @@ export async function upsertSpace(input: UpsertSpaceInput): Promise<ActionResult
     icon: input.icon.trim() || null,
     sort_order: input.sortOrder,
     is_active: input.isActive,
+    capacity_pessoas: input.capacityPessoas,
   }
 
   if (input.id) {

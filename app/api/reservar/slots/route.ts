@@ -30,9 +30,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const date = url.searchParams.get('date')
   const turno = (url.searchParams.get('turno') ?? 'jantar') as 'almoco' | 'jantar'
+  const spaceId = url.searchParams.get('space_id')
+  const partySizeRaw = url.searchParams.get('party_size')
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ ok: false, error: 'Data inválida' }, { status: 400 })
+  }
+  if (!spaceId || !/^[0-9a-f-]{36}$/i.test(spaceId)) {
+    return NextResponse.json({ ok: false, error: 'Espaço inválido' }, { status: 400 })
+  }
+  const partySize = Number(partySizeRaw)
+  if (!Number.isFinite(partySize) || partySize < 1 || partySize > 50) {
+    return NextResponse.json({ ok: false, error: 'Número de pessoas inválido' }, { status: 400 })
   }
 
   const ctx = await resolvePublicTenantContext(TENANT_SLUG, ESTABLISHMENT_SLUG)
@@ -40,7 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: 'Establishment não encontrado' }, { status: 404 })
   }
 
-  const slots = await getAvailability(ctx.establishmentId, date)
+  const slots = await getAvailability(ctx.establishmentId, date, spaceId, partySize)
 
   // Filtra por turno: almoço 11-16, jantar 17-23 (baseado em horário LOCAL do estabelecimento)
   const filtered = slots.filter((s) => {

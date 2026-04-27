@@ -96,30 +96,32 @@ export function BookingFlow({ dates, espacos, isAuthenticated }: BookingFlowProp
             return result
           }}
         />
+      ) : screen === 'horarios' ? (
+        <HorariosScreen
+          partySize={partySize}
+          spaceId={selectedEspacoId}
+          spaceName={selectedEspacoName}
+          dateISO={selectedDate.iso}
+          dateLabel={dateLabel}
+          turno={turno}
+          onBack={() => setScreen('espaco')}
+          onConfirm={(slotStart, horarioLabel) => {
+            setSelectedSlotISO(slotStart)
+            setSelectedSlotLabel(horarioLabel)
+            setScreen('dados')
+          }}
+        />
       ) : screen === 'espaco' ? (
         <EspacoScreen
           partySize={partySize}
           dateLabel={dateLabel}
-          horario={selectedSlotLabel}
+          horario=""
           espacos={espacos}
-          onBack={() => setScreen('horarios')}
+          onBack={() => setScreen('booking')}
           onConfirm={(espacoId, espacoName) => {
             setSelectedEspacoId(espacoId)
             setSelectedEspacoName(espacoName)
-            setScreen('dados')
-          }}
-        />
-      ) : screen === 'horarios' ? (
-        <HorariosScreen
-          partySize={partySize}
-          dateISO={selectedDate.iso}
-          dateLabel={dateLabel}
-          turno={turno}
-          onBack={() => setScreen('booking')}
-          onConfirm={(slotStart, horarioLabel) => {
-            setSelectedSlotISO(slotStart)
-            setSelectedSlotLabel(horarioLabel)
-            setScreen('espaco')
+            setScreen('horarios')
           }}
         />
       ) : (
@@ -131,7 +133,7 @@ export function BookingFlow({ dates, espacos, isAuthenticated }: BookingFlowProp
           turno={turno}
           setTurno={setTurno}
           dates={dates}
-          onContinue={() => setScreen('horarios')}
+          onContinue={() => setScreen('espaco')}
         />
       )}
       <BetoChat />

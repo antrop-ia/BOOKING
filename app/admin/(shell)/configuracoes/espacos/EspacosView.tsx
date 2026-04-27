@@ -22,6 +22,7 @@ interface DraftSpace {
   icon: string
   sortOrder: number
   isActive: boolean
+  capacityPessoas: number
 }
 
 const EMPTY: DraftSpace = {
@@ -31,6 +32,7 @@ const EMPTY: DraftSpace = {
   icon: '🍽️',
   sortOrder: 0,
   isActive: true,
+  capacityPessoas: 30,
 }
 
 export function EspacosView({ initial, establishmentName, canEdit, role }: Props) {
@@ -51,6 +53,7 @@ export function EspacosView({ initial, establishmentName, canEdit, role }: Props
         icon: editing.icon,
         sortOrder: editing.sortOrder,
         isActive: editing.isActive,
+        capacityPessoas: editing.capacityPessoas,
       })
       if (res.ok) {
         setToast({
@@ -162,7 +165,7 @@ export function EspacosView({ initial, establishmentName, canEdit, role }: Props
                     {s.description ?? '—'}
                   </p>
                   <p className="mt-1 font-mono text-xs text-neutral-400">
-                    slug: {s.slug} · ordem: {s.sortOrder}
+                    slug: {s.slug} · ordem: {s.sortOrder} · cap: {s.capacityPessoas} pessoas
                   </p>
                 </div>
                 {canEdit && (
@@ -178,6 +181,7 @@ export function EspacosView({ initial, establishmentName, canEdit, role }: Props
                           icon: s.icon ?? '🍽️',
                           sortOrder: s.sortOrder,
                           isActive: s.isActive,
+                          capacityPessoas: s.capacityPessoas,
                         })
                       }
                       disabled={isPending || editing !== null}
@@ -221,7 +225,11 @@ function SpaceForm({
 }) {
   const nameValid = draft.name.trim().length >= 2 && draft.name.trim().length <= 60
   const descValid = draft.description.length <= 240
-  const canSave = canEdit && !isPending && nameValid && descValid
+  const capacityValid =
+    Number.isInteger(draft.capacityPessoas) &&
+    draft.capacityPessoas >= 1 &&
+    draft.capacityPessoas <= 500
+  const canSave = canEdit && !isPending && nameValid && descValid && capacityValid
 
   return (
     <div className="rounded-lg border border-neutral-300 bg-neutral-50 p-5">
@@ -271,7 +279,7 @@ function SpaceForm({
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-neutral-700">
                 Ordem
@@ -284,7 +292,26 @@ function SpaceForm({
                 }
                 min={0}
                 max={999}
-                className="mt-1 block w-24 rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm shadow-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm shadow-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-700">
+                Capacidade <span className="text-neutral-400">(pessoas)</span>
+              </label>
+              <input
+                type="number"
+                value={draft.capacityPessoas}
+                onChange={(e) =>
+                  onChange({
+                    ...draft,
+                    capacityPessoas: Number(e.target.value) || 0,
+                  })
+                }
+                min={1}
+                max={500}
+                className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm shadow-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
               />
             </div>
 
@@ -295,7 +322,7 @@ function SpaceForm({
                 onChange={(e) => onChange({ ...draft, isActive: e.target.checked })}
                 className="h-4 w-4 rounded border-neutral-300"
               />
-              Ativo (aparece em /reservar)
+              Ativo
             </label>
           </div>
         </div>

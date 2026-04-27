@@ -8,6 +8,8 @@ export interface EstablishmentSpace {
   icon: string | null
   sortOrder: number
   isActive: boolean
+  /** Sprint F.3: capacidade total em pessoas no espaco. */
+  capacityPessoas: number
 }
 
 export interface EstablishmentSpaceRow extends EstablishmentSpace {
@@ -28,7 +30,7 @@ export async function listActiveSpaces(
   const admin = createAdminClient()
   const { data } = await admin
     .from('establishment_spaces')
-    .select('id, name, slug, description, icon, sort_order, is_active')
+    .select('id, name, slug, description, icon, sort_order, is_active, capacity_pessoas')
     .eq('establishment_id', establishmentId)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
@@ -68,7 +70,7 @@ export async function getSpaceById(
   const admin = createAdminClient()
   const { data } = await admin
     .from('establishment_spaces')
-    .select('id, name, slug, description, icon, sort_order, is_active')
+    .select('id, name, slug, description, icon, sort_order, is_active, capacity_pessoas')
     .eq('id', spaceId)
     .maybeSingle()
   return data ? mapRow(data) : null
@@ -82,6 +84,7 @@ interface RawSpaceRow {
   icon: string | null
   sort_order: number
   is_active: boolean
+  capacity_pessoas?: number
 }
 
 function mapRow(row: RawSpaceRow): EstablishmentSpace {
@@ -93,6 +96,7 @@ function mapRow(row: RawSpaceRow): EstablishmentSpace {
     icon: row.icon,
     sortOrder: row.sort_order,
     isActive: row.is_active,
+    capacityPessoas: row.capacity_pessoas ?? 30,
   }
 }
 

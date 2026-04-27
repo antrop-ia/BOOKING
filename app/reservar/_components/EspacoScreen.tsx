@@ -102,7 +102,7 @@ export default function EspacoScreen({
             fontFamily: "'DM Sans', sans-serif",
           }}
         >
-          Parrilla 8187 · {dateLabel} · {horario} · {partySize} pessoas
+          Parrilla 8187 · {dateLabel} · {partySize} pessoas{horario ? ` · ${horario}` : ''}
         </div>
 
         {espacos.length === 0 ? (

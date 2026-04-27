@@ -70,7 +70,18 @@ export interface CreateReservationParams {
 
 export type CreateReservationResult =
   | { ok: true; codigo: string; reservationId: string }
-  | { ok: false; error: string; code?: 'duplicate' | 'unknown' | 'invalid_phone' | 'over_limit' }
+  | {
+      ok: false
+      error: string
+      code?:
+        | 'duplicate'
+        | 'unknown'
+        | 'invalid_phone'
+        | 'over_limit'
+        | 'over_capacity'
+        | 'slot_blocked'
+        | 'space_not_found'
+    }
 
 /**
  * Limite de reservas futuras ativas por numero de WhatsApp.
@@ -117,29 +128,74 @@ export async function createReservation(
     pessoas: params.partySize,
   })
 
-  const { data, error } = await params.client
-    .from('reservations')
-    .insert({
-      tenant_id: params.tenantId,
-      establishment_id: params.establishmentId,
-      slot_start: slotStart.toISOString(),
-      slot_end: slotEnd.toISOString(),
-      guest_name: params.guest.nome,
-      guest_contact: guestContact,
-      status: params.status,
-      source: params.source,
-      space_id: params.spaceId ?? null,
-      user_id: params.userId ?? null,
-    })
-    .select('id')
-    .single()
+  // Sprint F.3: try_create_reservation faz advisory lock por (space, slot),
+  // valida capacidade e insere atomicamente. Retorna error_code in
+  // (over_capacity, slot_blocked, space_not_found) sem inserir, ou
+  // error_code=NULL no sucesso.
+  if (!params.spaceId) {
+    return { ok: false, error: 'Escolha um espaço.', code: 'space_not_found' }
+  }
+
+  const { data, error } = await params.client.rpc('try_create_reservation', {
+    p_tenant_id: params.tenantId,
+    p_establishment_id: params.establishmentId,
+    p_space_id: params.spaceId,
+    p_slot_start: slotStart.toISOString(),
+    p_slot_end: slotEnd.toISOString(),
+    p_guest_name: params.guest.nome,
+    p_guest_contact: guestContact,
+    p_status: params.status,
+    p_source: params.source,
+    p_user_id: params.userId ?? null,
+    p_party_size: params.partySize,
+  })
 
   if (error) {
-    if (error.code === '23505') {
+    return {
+      ok: false,
+      error: 'Não foi possível registrar a reserva. Tente novamente.',
+      code: 'unknown',
+    }
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | {
+        ok: boolean
+        reservation_id: string | null
+        error_code: string | null
+        remaining_pessoas: number | null
+      }
+    | undefined
+
+  if (!row) {
+    return {
+      ok: false,
+      error: 'Não foi possível registrar a reserva. Tente novamente.',
+      code: 'unknown',
+    }
+  }
+
+  if (!row.ok) {
+    if (row.error_code === 'over_capacity') {
+      const left = row.remaining_pessoas ?? 0
+      const msg =
+        left === 0
+          ? 'Esse horário está lotado nesse espaço. Escolha outro.'
+          : `Restam apenas ${left} ${left === 1 ? 'vaga' : 'vagas'} nesse horário/espaço. Reduza o número de pessoas ou escolha outro.`
+      return { ok: false, error: msg, code: 'over_capacity' }
+    }
+    if (row.error_code === 'slot_blocked') {
       return {
         ok: false,
-        error: 'Esse horário acabou de ser reservado. Escolha outro.',
-        code: 'duplicate',
+        error: 'Esse horário foi bloqueado pelo restaurante. Escolha outro.',
+        code: 'slot_blocked',
+      }
+    }
+    if (row.error_code === 'space_not_found') {
+      return {
+        ok: false,
+        error: 'Espaço inválido ou inativo.',
+        code: 'space_not_found',
       }
     }
     return {
@@ -149,8 +205,16 @@ export async function createReservation(
     }
   }
 
-  const codigo = `#P8187-${data.id.slice(0, 4).toUpperCase()}`
-  return { ok: true, codigo, reservationId: data.id }
+  if (!row.reservation_id) {
+    return {
+      ok: false,
+      error: 'Não foi possível registrar a reserva. Tente novamente.',
+      code: 'unknown',
+    }
+  }
+
+  const codigo = `#P8187-${row.reservation_id.slice(0, 4).toUpperCase()}`
+  return { ok: true, codigo, reservationId: row.reservation_id }
 }
 
 export function reservationCodigo(id: string): string {
