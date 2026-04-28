@@ -51,12 +51,20 @@ export async function GET(request: Request) {
 
   const slots = await getAvailability(ctx.establishmentId, date, spaceId, partySize)
 
-  // Filtra por turno: almoço 11-16, jantar 17-23 (baseado em horário LOCAL do estabelecimento)
+  // Filtra por turno: almoço 11-16, jantar 17-23 — em hora LOCAL do
+  // estabelecimento (ctx.timezone, default America/Recife). Antes usava
+  // d.getHours() que retorna server-local (UTC), entao slots gerados em
+  // BR caiam no balde errado. Intl.DateTimeFormat com timeZone resolve.
+  const tz = ctx.timezone || 'America/Recife'
+  const hourFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    hourCycle: 'h23',
+  })
   const filtered = slots.filter((s) => {
-    const d = new Date(s.start)
-    const hour = d.getHours()
-    if (turno === 'almoco') return hour >= 11 && hour < 16
-    return hour >= 17 && hour < 24
+    const localHour = parseInt(hourFormatter.format(new Date(s.start)), 10)
+    if (turno === 'almoco') return localHour >= 11 && localHour < 16
+    return localHour >= 17 && localHour < 24
   })
 
   // Cache-Control de 60s e setado no middleware.ts (Sprint 4 D.2). Em Next 16,
