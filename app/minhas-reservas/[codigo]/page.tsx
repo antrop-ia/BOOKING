@@ -55,16 +55,30 @@ export default async function ReservaDetailPage({ params }: PageProps) {
 
   const timezone = est?.timezone ?? 'America/Recife'
 
+  // Postgres nao tem ILIKE em uuid. Lookup por prefixo virou um range
+  // [low, high) construido a partir dos 4 hex chars do codigo. Mesmo
+  // workaround usado em /reservar/consultar/[codigo].
+  const startInt = parseInt(uuidPrefix, 16)
+  const lowUuid = `${uuidPrefix}0000-0000-0000-0000-000000000000`
+  const highUuid =
+    startInt >= 0xffff
+      ? 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+      : `${(startInt + 1).toString(16).padStart(4, '0')}0000-0000-0000-0000-000000000000`
+
   // Busca por prefixo do uuid + ownership. Limita a 2 pra detectar colisao
   // (raro, mas possivel — codigo e so 4 chars).
-  const { data: rows } = await admin
+  const baseQuery = admin
     .from('reservations')
     .select(
       'id, slot_start, slot_end, guest_name, guest_contact, status, created_at, space:establishment_spaces(name, icon)'
     )
     .eq('user_id', user.id)
-    .ilike('id', `${uuidPrefix}%`)
+    .gte('id', lowUuid)
     .limit(2)
+  const { data: rows } =
+    startInt >= 0xffff
+      ? await baseQuery.lte('id', highUuid)
+      : await baseQuery.lt('id', highUuid)
 
   if (!rows || rows.length === 0) notFound()
   // Colisao de prefixo dentro do mesmo user: forca voltar pra listagem.
