@@ -41,7 +41,11 @@ export default async function AdminDashboard() {
       .eq('tenant_id', ctx.tenantId)
       .neq('status', 'cancelled')
 
-  const [todayRes, tomorrowRes, weekRes, upcomingRes] = await Promise.all([
+  // Producao: quantos eventos suspeitos nas ultimas 24h. Da pra ter um
+  // sinal de alerta no dashboard sem precisar entrar em /admin/audit.
+  const last24h = new Date(Date.now() - 24 * 60 * 60_000).toISOString()
+
+  const [todayRes, tomorrowRes, weekRes, upcomingRes, suspiciousRes] = await Promise.all([
     base().gte('slot_start', todayStart).lt('slot_start', tomorrowStart),
     base().gte('slot_start', tomorrowStart).lt('slot_start', dayAfterStart),
     base().gte('slot_start', todayStart).lt('slot_start', weekEndStart),
@@ -54,11 +58,24 @@ export default async function AdminDashboard() {
       .lt('slot_start', dayAfterStart)
       .order('slot_start', { ascending: true })
       .limit(5),
+    admin
+      .from('audit_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', ctx.tenantId)
+      .in('event_type', [
+        'rate_limit_reserve',
+        'rate_limit_slots',
+        'reservation_rejected_over_limit',
+        'reservation_rejected_invalid_phone',
+        'burst_detected',
+      ])
+      .gte('ts', last24h),
   ])
 
   const todayCount = todayRes.count ?? 0
   const tomorrowCount = tomorrowRes.count ?? 0
   const weekCount = weekRes.count ?? 0
+  const suspiciousCount = suspiciousRes.count ?? 0
 
   const { data: partyRows } = await admin
     .from('reservations')
@@ -104,6 +121,26 @@ export default async function AdminDashboard() {
           hint="Hoje + amanhã"
         />
       </div>
+
+      {suspiciousCount > 0 && (
+        <Link
+          href="/admin/audit"
+          className="mt-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-5 py-3 text-sm transition-colors hover:bg-amber-100"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <p className="font-medium text-amber-900">
+                {suspiciousCount} {suspiciousCount === 1 ? 'evento suspeito' : 'eventos suspeitos'} nas últimas 24h
+              </p>
+              <p className="text-xs text-amber-700">
+                Rate limit, rejeições ou bursts detectados. Confira em /admin/audit.
+              </p>
+            </div>
+          </div>
+          <span className="text-amber-700">→</span>
+        </Link>
+      )}
 
       <div className="mt-8">
         <div className="flex items-center justify-between">
