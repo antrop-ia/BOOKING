@@ -4,6 +4,7 @@ import type { EspacoOption } from './_components/EspacoScreen'
 import { resolvePublicTenantContext } from '@/app/lib/tenant'
 import { listActiveSpaces } from '@/app/lib/spaces'
 import { PublicHeader } from '@/app/_components/PublicHeader'
+import { PublicFooter } from '@/app/_components/PublicFooter'
 import { createClient } from '@/app/lib/supabase/server'
 
 const WEEKDAYS_PT_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -71,6 +72,7 @@ export default async function ReservarPage() {
     <>
       <PublicHeader />
       <BookingFlow dates={dates} espacos={espacos} isAuthenticated={Boolean(user)} />
+      <PublicFooter />
     </>
   )
 }
