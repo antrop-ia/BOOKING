@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0A0906"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#F5C042" stroke-width="2.5"/>
+  <text x="32" y="29" text-anchor="middle"
+        font-family="'DM Sans', system-ui, -apple-system, sans-serif"
+        font-size="9" font-weight="700"
+        letter-spacing="1.2" fill="#F5C042">PARRILLA</text>
+  <text x="32" y="44" text-anchor="middle"
+        font-family="'DM Sans', system-ui, -apple-system, sans-serif"
+        font-size="14" font-weight="800"
+        fill="#F5C042">8187</text>
+</svg>
