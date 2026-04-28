@@ -373,6 +373,37 @@ export default function DadosScreen({
         >
           Cancelamento gratuito até 2h antes
         </div>
+
+        <div
+          style={{
+            color: '#5C5549',
+            fontSize: '10px',
+            textAlign: 'center',
+            marginTop: '14px',
+            lineHeight: 1.5,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Ao confirmar, você concorda com os{' '}
+          <a
+            href="/termos"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#9B9385', textDecoration: 'underline' }}
+          >
+            Termos
+          </a>{' '}
+          e a{' '}
+          <a
+            href="/privacidade"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#9B9385', textDecoration: 'underline' }}
+          >
+            Política de Privacidade
+          </a>
+          .
+        </div>
       </div>
     </div>
   )
