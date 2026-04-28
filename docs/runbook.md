@@ -566,6 +566,118 @@ curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/notification_log?select=attempted_at,
 
 ---
 
+## 10. LGPD — atender pedidos de titular de dados
+
+A [Politica de Privacidade](https://reservas.parilla8187.antrop-ia.com/privacidade) garante ao titular o direito de:
+- Acesso aos dados pessoais
+- Correcao de dados incorretos
+- Exclusao (direito ao esquecimento)
+- Portabilidade
+- Revogacao de consentimento
+
+Pedidos chegam por email ou WhatsApp do restaurante. Use os runbooks abaixo.
+
+### 10.1 Pedido de acesso (export)
+
+Cliente quer ver tudo que temos sobre ele. Identificar pelo email ou WhatsApp informado.
+
+```sql
+-- No SQL Editor do Supabase. Substitua o valor de :ident.
+WITH alvo AS (
+  SELECT id AS user_id
+    FROM auth.users
+   WHERE email = 'cliente@example.com'  -- OU buscar via WhatsApp no guest_contact
+)
+SELECT
+  r.id,
+  r.slot_start,
+  r.party_size,
+  r.guest_name,
+  r.guest_contact,
+  r.status,
+  r.created_at,
+  s.name AS espaco
+FROM public.reservations r
+LEFT JOIN public.establishment_spaces s ON s.id = r.space_id
+WHERE r.user_id IN (SELECT user_id FROM alvo)
+   OR r.guest_contact ILIKE '%cliente@example.com%'
+ORDER BY r.slot_start DESC;
+```
+
+Exporta o resultado como CSV (botao Download na UI do Supabase) e envia ao titular dentro de **15 dias** (prazo LGPD).
+
+### 10.2 Pedido de exclusao
+
+Cliente pede pra apagar os dados dele. Aplicar **soft delete** primeiro (anonimizacao), nao hard delete — preserva auditoria.
+
+```sql
+-- 1. Cancela reservas futuras
+UPDATE public.reservations
+   SET status = 'cancelled'
+ WHERE (user_id = (SELECT id FROM auth.users WHERE email = 'cliente@example.com')
+     OR guest_contact ILIKE '%cliente@example.com%')
+   AND slot_start > NOW();
+
+-- 2. Anonimiza reservas passadas (mantem fato historico, remove identificacao)
+UPDATE public.reservations
+   SET guest_name = '[anonimizado]',
+       guest_contact = '[anonimizado]',
+       user_id = NULL
+ WHERE (user_id = (SELECT id FROM auth.users WHERE email = 'cliente@example.com')
+     OR guest_contact ILIKE '%cliente@example.com%');
+
+-- 3. Apaga conta auth (se existir)
+DELETE FROM auth.users WHERE email = 'cliente@example.com';
+
+-- 4. Limpa Beto conversations associadas
+DELETE FROM public.beto_conversations
+ WHERE session_id IN (
+   SELECT session_id FROM public.beto_conversations
+    WHERE messages::text ILIKE '%cliente@example.com%'
+ );
+```
+
+Confirma com o titular por email/WhatsApp no prazo de **15 dias**.
+
+### 10.3 Pedido de portabilidade
+
+Mesmo SELECT do 10.1, mas exporta em **JSON estruturado** (mais util pra outro sistema):
+
+```sql
+SELECT json_agg(row_to_json(r))
+  FROM (
+    SELECT r.id, r.slot_start, r.party_size, r.guest_name,
+           r.guest_contact, r.status, r.created_at, s.name AS espaco
+      FROM public.reservations r
+      LEFT JOIN public.establishment_spaces s ON s.id = r.space_id
+     WHERE r.user_id = (SELECT id FROM auth.users WHERE email = 'cliente@example.com')
+     ORDER BY r.slot_start DESC
+  ) r;
+```
+
+### 10.4 Documentacao do atendimento
+
+Em qualquer pedido LGPD, registrar no audit_log:
+
+```sql
+INSERT INTO public.audit_log (event_type, tenant_id, ip, details)
+VALUES (
+  'lgpd_request_handled',
+  'db426261-9f09-4eec-9c59-ed2ac2ecdeed',
+  NULL,
+  jsonb_build_object(
+    'request_type', 'access',  -- ou 'deletion', 'portability', 'rectification'
+    'subject_email', 'cliente@example.com',
+    'handled_by', 'admin@parrilla8187.com.br',
+    'date', now()
+  )
+);
+```
+
+> **NOTA:** o tipo `lgpd_request_handled` nao esta no enum `AuditEventType` em `app/lib/audit.ts`. Como o INSERT e SQL direto, nao precisa atualizar o app — o constraint de `event_type text NOT NULL` aceita qualquer string. Se quiser exibir essas linhas no `/admin/audit` com label/cor proprios, adicionar ao enum em codigo.
+
+---
+
 ## Apendice — referencias rapidas
 
 ### Locais importantes
@@ -608,11 +720,12 @@ docker service logs -f parrilla-booking_app
 docker service logs traefik_traefik 2>&1 | grep -i "parrilla\|uptime"
 
 # Rebuild + deploy rapido (sem git pull)
-cd /root/BOOKING && source .env && \
+cd /root/BOOKING && set -a && source .env && set +a && \
   docker build --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
     --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+    --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="$NEXT_PUBLIC_TURNSTILE_SITE_KEY" \
     -t parrilla-booking:latest . && \
-  docker service update --image parrilla-booking:latest parrilla-booking_app --force
+  docker service update --image parrilla-booking:latest --force parrilla-booking_app
 
 # Forcar backup agora (fora do horario)
 systemctl start parrilla-backup.service
@@ -623,3 +736,5 @@ tail -20 /var/log/parrilla-backup.log
 
 - `2026-04-21` — versao inicial, cobrindo rollback do app, restore de banco, reset de senha admin, certificado Let's Encrypt e Uptime Kuma
 - `2026-04-21` — Sprint 8: secao 7 (pre-requisitos Supabase para magic link) e secao 8 (templates de email customizados)
+- `2026-04-25` — Sprint 9: secao 9 (Evolution API — diagnostico, re-parear, restart, backup, restore, reset, logs)
+- `2026-04-28` — Producao: secao 10 (LGPD — atender pedidos de titular de dados). Comando de build no apendice atualizado pra incluir `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (sem isso o captcha quebra em builds novos).
